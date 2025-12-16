@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Allow cross-origin requests from local network devices (e.g., phone)
+  allowedDevOrigins: ["*"],
   images: {
     // Keep remote patterns for any remaining Next.js Image usage
     remotePatterns: [

@@ -159,6 +159,7 @@ export interface Manga {
   contentRating: string;
   publicationDemographic: string | null;
   originalLanguage: string;
+  lastChapter: string | null;
   chapterList: Chapter[];
 }
 

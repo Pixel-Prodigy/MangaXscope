@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Dialog,
@@ -14,7 +14,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Filter, X, Check, Loader2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Filter, X, Check, Loader2, Search } from "lucide-react";
 import { useQueryStates, parseAsArrayOf, parseAsString } from "nuqs";
 import { cn } from "@/lib/utils";
 
@@ -53,6 +54,9 @@ export function GenreFilterDialog() {
   );
 
   const [open, setOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   // Fetch available tags from MangaDex
   const { data: tagsData, isLoading: isLoadingTags } = useQuery<MangaDexTagsResponse>({
@@ -73,6 +77,62 @@ export function GenreFilterDialog() {
   const availableTags = tagsData?.data.filter(
     (tag) => tag.attributes.group === "genre" || tag.attributes.group === "theme"
   ) || [];
+
+  // Group tags by first letter and filter by search query
+  const groupedTags = useMemo(() => {
+    const filtered = availableTags.filter((tag) => {
+      const tagName = tag.attributes.name.en || Object.values(tag.attributes.name)[0] || "Unknown";
+      return tagName.toLowerCase().includes(searchQuery.toLowerCase());
+    });
+
+    const grouped: Record<string, typeof availableTags> = {};
+    filtered.forEach((tag) => {
+      const tagName = tag.attributes.name.en || Object.values(tag.attributes.name)[0] || "Unknown";
+      const firstLetter = tagName.charAt(0).toUpperCase();
+      const letter = /[A-Z]/.test(firstLetter) ? firstLetter : "#";
+      
+      if (!grouped[letter]) {
+        grouped[letter] = [];
+      }
+      grouped[letter].push(tag);
+    });
+
+    // Sort tags within each group
+    Object.keys(grouped).forEach((letter) => {
+      grouped[letter].sort((a, b) => {
+        const nameA = a.attributes.name.en || Object.values(a.attributes.name)[0] || "";
+        const nameB = b.attributes.name.en || Object.values(b.attributes.name)[0] || "";
+        return nameA.localeCompare(nameB);
+      });
+    });
+
+    return grouped;
+  }, [availableTags, searchQuery]);
+
+  // Get all available letters
+  const availableLetters = useMemo(() => {
+    const letters = Object.keys(groupedTags).sort();
+    return letters;
+  }, [groupedTags]);
+
+  // Scroll to a specific letter section
+  const scrollToLetter = (letter: string) => {
+    const element = sectionRefs.current[letter];
+    if (element && scrollAreaRef.current) {
+      const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+      if (scrollContainer) {
+        const containerRect = scrollContainer.getBoundingClientRect();
+        const elementRect = element.getBoundingClientRect();
+        const scrollTop = scrollContainer.scrollTop;
+        const targetScrollTop = scrollTop + elementRect.top - containerRect.top - 20;
+        
+        scrollContainer.scrollTo({
+          top: targetScrollTop,
+          behavior: "smooth",
+        });
+      }
+    }
+  };
 
   // Initialize local filters from URL params
   const initializeFilters = () => {
@@ -101,6 +161,13 @@ export function GenreFilterDialog() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, availableTags.length, includeGenres.include, includeGenres.exclude]);
+
+  // Reset search when dialog closes
+  useEffect(() => {
+    if (!open) {
+      setSearchQuery("");
+    }
+  }, [open]);
 
   const toggleGenre = (tagId: string, tagName: string) => {
     const current = localFilters.get(tagId);
@@ -167,45 +234,110 @@ export function GenreFilterDialog() {
           )}
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[80vh] max-w-2xl">
+      <DialogContent className="max-h-[85vh] max-w-4xl flex flex-col">
         <DialogHeader>
           <DialogTitle>Filter by Genres</DialogTitle>
           <DialogDescription>
             Click once to include, twice to exclude, three times to remove
           </DialogDescription>
         </DialogHeader>
-        <ScrollArea className="max-h-[50vh] pr-4">
-          {isLoadingTags ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {availableTags.map((tag) => {
-                const filter = localFilters.get(tag.id);
-                const mode = filter?.mode || null;
-                const tagName = tag.attributes.name.en || Object.values(tag.attributes.name)[0] || "Unknown";
+        
+        {/* Search Input */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            type="text"
+            placeholder="Search genres..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+          />
+        </div>
 
-                return (
-                  <Badge
-                    key={tag.id}
-                    variant={mode === "exclude" ? "destructive" : "secondary"}
-                    className={cn(
-                      "cursor-pointer transition-all hover:scale-105",
-                      mode === "include" && "bg-primary text-primary-foreground",
-                      mode === "exclude" && "bg-destructive text-destructive-foreground"
-                    )}
-                    onClick={() => toggleGenre(tag.id, tagName)}
-                  >
-                    {mode === "include" && <Check className="mr-1 h-3 w-3" />}
-                    {mode === "exclude" && <X className="mr-1 h-3 w-3" />}
-                    {tagName}
-                  </Badge>
-                );
-              })}
+        <div className="flex gap-4 flex-1 min-h-0">
+          {/* Main Content Area */}
+          <ScrollArea ref={scrollAreaRef} className="flex-1 max-h-[50vh] pr-4">
+            {isLoadingTags ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : availableLetters.length === 0 ? (
+              <div className="flex items-center justify-center py-8 text-muted-foreground">
+                No genres found matching your search
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {availableLetters.map((letter) => {
+                  const tags = groupedTags[letter];
+                  return (
+                    <div
+                      key={letter}
+                      ref={(el) => {
+                        sectionRefs.current[letter] = el;
+                      }}
+                      className="space-y-3"
+                    >
+                      <div className="sticky top-0 z-10 bg-background pb-2">
+                        <h3 className="text-lg font-semibold text-primary border-b pb-1">
+                          {letter}
+                        </h3>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {tags.map((tag) => {
+                          const filter = localFilters.get(tag.id);
+                          const mode = filter?.mode || null;
+                          const tagName = tag.attributes.name.en || Object.values(tag.attributes.name)[0] || "Unknown";
+
+                          return (
+                            <Badge
+                              key={tag.id}
+                              variant={mode === "exclude" ? "destructive" : "secondary"}
+                              className={cn(
+                                "cursor-pointer transition-all hover:scale-105",
+                                mode === "include" && "bg-primary text-primary-foreground",
+                                mode === "exclude" && "bg-destructive text-destructive-foreground"
+                              )}
+                              onClick={() => toggleGenre(tag.id, tagName)}
+                            >
+                              {mode === "include" && <Check className="mr-1 h-3 w-3" />}
+                              {mode === "exclude" && <X className="mr-1 h-3 w-3" />}
+                              {tagName}
+                            </Badge>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </ScrollArea>
+
+          {/* Alphabetical Navigation Sidebar */}
+          {!isLoadingTags && availableLetters.length > 0 && (
+            <div className="flex flex-col gap-1 border-l pl-4">
+              <div className="text-xs font-medium text-muted-foreground mb-2 sticky top-0 bg-background pb-1">
+                Jump to
+              </div>
+              <ScrollArea className="h-full max-h-[50vh]">
+                <div className="flex flex-col gap-1">
+                  {availableLetters.map((letter) => (
+                    <Button
+                      key={letter}
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0 text-xs font-medium hover:bg-primary hover:text-primary-foreground"
+                      onClick={() => scrollToLetter(letter)}
+                    >
+                      {letter}
+                    </Button>
+                  ))}
+                </div>
+              </ScrollArea>
             </div>
           )}
-        </ScrollArea>
+        </div>
+
         <Separator />
         <div className="flex justify-between">
           <Button variant="outline" onClick={clearFilters}>

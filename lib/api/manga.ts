@@ -6,6 +6,9 @@ import type {
   SearchParams,
   MangaDexResponse,
   MangaDexManga,
+  MangaDexRelationship,
+  MangaDexTag,
+  MangaDexAltTitle,
   MangaListItem,
 } from "./types";
 
@@ -50,7 +53,7 @@ async function transformMangaDexManga(manga: MangaDexManga): Promise<MangaListIt
 
   // Get alt titles
   const altTitles = manga.attributes.altTitles
-    .map(alt => alt.en || alt.ja || Object.values(alt)[0])
+    .map((alt: MangaDexAltTitle) => alt.en || alt.ja || Object.values(alt)[0])
     .filter(Boolean) as string[];
 
   // Get description (prefer English, fallback to first available)
@@ -61,7 +64,7 @@ async function transformMangaDexManga(manga: MangaDexManga): Promise<MangaListIt
 
   // Get cover art ID from relationships
   const coverArtRelationship = manga.relationships.find(
-    rel => rel.type === "cover_art"
+    (rel: MangaDexRelationship) => rel.type === "cover_art"
   );
   const coverArtId = coverArtRelationship?.id || null;
 
@@ -69,7 +72,7 @@ async function transformMangaDexManga(manga: MangaDexManga): Promise<MangaListIt
   const image = await getCoverArtUrl(manga.id, coverArtId);
 
   // Transform tags
-  const tags = manga.attributes.tags.map(tag => ({
+  const tags = manga.attributes.tags.map((tag: MangaDexTag) => ({
     id: tag.id,
     name: tag.attributes.name.en || Object.values(tag.attributes.name)[0] || "Unknown",
     group: tag.attributes.group,
@@ -231,14 +234,14 @@ export async function getManga(id: string): Promise<Manga> {
 
   // Get cover art
   const coverArtRelationship = mangaDexManga.relationships.find(
-    rel => rel.type === "cover_art"
+    (rel: MangaDexRelationship) => rel.type === "cover_art"
   );
   const coverArtId = coverArtRelationship?.id || null;
   const imageUrl = await getCoverArtUrl(id, coverArtId);
 
   // Get author and artist
-  const authorRel = mangaDexManga.relationships.find(rel => rel.type === "author");
-  const artistRel = mangaDexManga.relationships.find(rel => rel.type === "artist");
+  const authorRel = mangaDexManga.relationships.find((rel: MangaDexRelationship) => rel.type === "author");
+  const artistRel = mangaDexManga.relationships.find((rel: MangaDexRelationship) => rel.type === "artist");
   
   // Note: We'd need to fetch author/artist details separately, for now use placeholder
   const author = authorRel ? "Unknown Author" : "Unknown";
@@ -246,16 +249,16 @@ export async function getManga(id: string): Promise<Manga> {
 
   // Transform tags to genres
   const genres = mangaDexManga.attributes.tags
-    .filter(tag => tag.attributes.group === "genre")
-    .map(tag => tag.attributes.name.en || Object.values(tag.attributes.name)[0] || "Unknown");
+    .filter((tag: MangaDexTag) => tag.attributes.group === "genre")
+    .map((tag: MangaDexTag) => tag.attributes.name.en || Object.values(tag.attributes.name)[0] || "Unknown");
 
   // Get alt titles
   const altTitles = mangaDexManga.attributes.altTitles
-    .map(alt => alt.en || alt.ja || Object.values(alt)[0])
+    .map((alt: MangaDexAltTitle) => alt.en || alt.ja || Object.values(alt)[0])
     .filter(Boolean) as string[];
 
   // Transform tags
-  const tags = mangaDexManga.attributes.tags.map(tag => ({
+  const tags = mangaDexManga.attributes.tags.map((tag: MangaDexTag) => ({
     id: tag.id,
     name: tag.attributes.name.en || Object.values(tag.attributes.name)[0] || "Unknown",
     group: tag.attributes.group,
@@ -277,7 +280,6 @@ export async function getManga(id: string): Promise<Manga> {
     artist,
     status,
     updated,
-    view: "N/A", // MangaDex doesn't provide view counts
     description,
     genres,
     tags,
@@ -285,6 +287,7 @@ export async function getManga(id: string): Promise<Manga> {
     contentRating: mangaDexManga.attributes.contentRating,
     publicationDemographic: mangaDexManga.attributes.publicationDemographic,
     originalLanguage: mangaDexManga.attributes.originalLanguage,
+    lastChapter: mangaDexManga.attributes.lastChapter,
     chapterList: [], // Will need to fetch chapters separately
   };
 }

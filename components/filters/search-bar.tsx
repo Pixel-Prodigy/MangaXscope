@@ -43,7 +43,7 @@ export function SearchBar() {
       // Set new timer
       debounceTimerRef.current = setTimeout(() => {
         setIsDebouncing(false);
-        setSearch({ q: value.trim() || null, page: 1 }); // Reset to page 1 on new search
+        setSearch({ q: value.trim() || null });
       }, DEBOUNCE_DELAY);
     },
     [setSearch]
@@ -69,7 +69,7 @@ export function SearchBar() {
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
-    setSearch({ q: null, page: 1 });
+    setSearch({ q: null });
   };
 
   return (
