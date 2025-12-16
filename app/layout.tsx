@@ -25,8 +25,8 @@ export const metadata: Metadata = {
     userScalable: false,
   },
   icons: {
-    icon: "/manga-logo.webp",
-    apple: "/manga-logo.webp",
+    icon: "/hat.png",
+    apple: "/hat.png",
   },
   openGraph: {
     title: "MangaHook - Discover Your Next Manga",
