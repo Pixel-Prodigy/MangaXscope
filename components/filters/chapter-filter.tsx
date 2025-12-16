@@ -20,7 +20,6 @@ export function ChapterFilter() {
   const [localMin, setLocalMin] = useState(chapterFilter.minChapters || "");
   const [localMax, setLocalMax] = useState(chapterFilter.maxChapters || "");
 
-  // Sync local state with URL params
   useEffect(() => {
     setLocalMin(chapterFilter.minChapters || "");
     setLocalMax(chapterFilter.maxChapters || "");
