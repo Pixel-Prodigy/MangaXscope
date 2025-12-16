@@ -57,7 +57,6 @@ export function GenreFilterDialog() {
   const [searchQuery, setSearchQuery] = useState("");
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
-  // Fetch available tags from MangaDex
   const { data: tagsData, isLoading: isLoadingTags } =
     useQuery<MangaDexTagsResponse>({
       queryKey: ["mangadex-tags"],
@@ -70,17 +69,15 @@ export function GenreFilterDialog() {
         }
         return response.json();
       },
-      enabled: open, // Only fetch when dialog is open
+      enabled: open,
     });
 
-  // Filter to only genre and theme tags
   const availableTags =
     tagsData?.data.filter(
       (tag) =>
         tag.attributes.group === "genre" || tag.attributes.group === "theme"
     ) || [];
 
-  // Group tags by first letter and filter by search query
   const groupedTags = useMemo(() => {
     const filtered = availableTags.filter((tag) => {
       const tagName =
@@ -105,7 +102,6 @@ export function GenreFilterDialog() {
       grouped[letter].push(tag);
     });
 
-    // Sort tags within each group
     Object.keys(grouped).forEach((letter) => {
       grouped[letter].sort((a, b) => {
         const nameA =
@@ -119,13 +115,11 @@ export function GenreFilterDialog() {
     return grouped;
   }, [availableTags, searchQuery]);
 
-  // Get all available letters
   const availableLetters = useMemo(() => {
     const letters = Object.keys(groupedTags).sort();
     return letters;
   }, [groupedTags]);
 
-  // Initialize local filters from URL params
   const initializeFilters = () => {
     const filters = new Map<string, GenreFilter>();
     availableTags.forEach((tag) => {
@@ -148,12 +142,10 @@ export function GenreFilterDialog() {
     new Map()
   );
 
-  // Update local filters when dialog opens or tags data changes
   useEffect(() => {
     if (open && availableTags.length > 0) {
       setLocalFilters(initializeFilters());
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     open,
     availableTags.length,
@@ -161,7 +153,6 @@ export function GenreFilterDialog() {
     includeGenres.exclude,
   ]);
 
-  // Reset search when dialog closes
   useEffect(() => {
     if (!open) {
       setSearchQuery("");
@@ -242,7 +233,6 @@ export function GenreFilterDialog() {
           </DialogDescription>
         </DialogHeader>
 
-        {/* Search Input */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -255,7 +245,6 @@ export function GenreFilterDialog() {
         </div>
 
         <div className="flex gap-4 flex-1 min-h-0">
-          {/* Main Content Area */}
           <ScrollArea ref={scrollAreaRef} className="flex-1 max-h-[50vh] pr-4">
             {isLoadingTags ? (
               <div className="flex items-center justify-center py-8">
