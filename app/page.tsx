@@ -19,7 +19,7 @@ import { Navbar } from "@/components/navbar";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 const LIMIT = 20;
-const PREFETCH_RANGE = 5;
+const PREFETCH_RANGE = 3;
 const PREFETCH_STALE_TIME = 5 * 60 * 1000;
 const CATEGORY_MAP: Record<string, string> = {
   manga: "ja",
@@ -47,11 +47,28 @@ export default function Home() {
   );
 
   const isSearch = !!searchParams.q;
+  const prevFiltersRef = useRef<string>("");
 
+  // Reset page to 1 only when filters change (not when page itself changes)
   useEffect(() => {
-    if (searchParams.page !== 1) {
-      setSearchParams({ page: 1 });
+    const currentFilters = JSON.stringify({
+      type: searchParams.type,
+      includeCategories: searchParams.includeCategories,
+      excludeCategories: searchParams.excludeCategories,
+      include: searchParams.include,
+      exclude: searchParams.exclude,
+      q: searchParams.q,
+      minChapters: searchParams.minChapters,
+      maxChapters: searchParams.maxChapters,
+    });
+
+    if (prevFiltersRef.current && prevFiltersRef.current !== currentFilters) {
+      if (searchParams.page !== 1) {
+        setSearchParams({ page: 1 });
+      }
     }
+
+    prevFiltersRef.current = currentFilters;
   }, [
     searchParams.type,
     searchParams.includeCategories,
@@ -165,6 +182,9 @@ export default function Home() {
     queryKey,
     queryFn: () => fetchMangaData(searchParams.page),
     enabled: !isSearch || !!searchParams.q,
+    staleTime: 2 * 60 * 1000, // 2 minutes - data stays fresh
+    gcTime: 10 * 60 * 1000, // 10 minutes - keep in cache longer
+    refetchOnWindowFocus: false, // Don't refetch on window focus for better performance
   });
 
   const metadata = data?.metaData;
@@ -199,57 +219,81 @@ export default function Home() {
     ]
   );
 
+  // Optimized prefetch handler with priority-based prefetching
   const handlePrefetchPage = useCallback(
-    (page: number) => {
+    (page: number, priority: "high" | "low" = "low") => {
       if (!metadata || page < 1 || page > metadata.totalPages) return;
 
       const pageQueryKey = buildQueryKeyForPage(page);
-      if (!queryClient.getQueryData(pageQueryKey)) {
-        queryClient.prefetchQuery({
-          queryKey: pageQueryKey,
-          queryFn: () => fetchMangaData(page),
-          staleTime: PREFETCH_STALE_TIME,
-        });
-      }
+      const existingData = queryClient.getQueryData(pageQueryKey);
+
+      // Skip if already cached and fresh
+      if (existingData) return;
+
+      // High priority: immediate prefetch (for adjacent pages)
+      // Low priority: background prefetch (for further pages)
+      queryClient.prefetchQuery({
+        queryKey: pageQueryKey,
+        queryFn: () => fetchMangaData(page),
+        staleTime: PREFETCH_STALE_TIME,
+        gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
+      });
     },
     [metadata, buildQueryKeyForPage, queryClient, fetchMangaData]
   );
 
+  // Smart prefetch: prioritize adjacent pages, then expand
   useEffect(() => {
     if (!metadata || isLoading) return;
 
     const currentPage = searchParams.page;
     const totalPages = metadata.totalPages;
-    const pagesToPrefetch: number[] = [];
+    const prefetchQueue: Array<{ page: number; priority: "high" | "low" }> = [];
 
-    for (let i = 1; i <= PREFETCH_RANGE; i++) {
-      const nextPage = currentPage + i;
-      const prevPage = currentPage - i;
-      if (nextPage <= totalPages) pagesToPrefetch.push(nextPage);
-      if (prevPage >= 1) pagesToPrefetch.push(prevPage);
+    // High priority: immediate next/prev pages
+    if (currentPage + 1 <= totalPages) {
+      prefetchQueue.push({ page: currentPage + 1, priority: "high" });
+    }
+    if (currentPage - 1 >= 1) {
+      prefetchQueue.push({ page: currentPage - 1, priority: "high" });
     }
 
-    pagesToPrefetch.forEach((page) => {
-      const pageQueryKey = buildQueryKeyForPage(page);
-      if (!queryClient.getQueryData(pageQueryKey)) {
-        queryClient.prefetchQuery({
-          queryKey: pageQueryKey,
-          queryFn: () => fetchMangaData(page),
-          staleTime: PREFETCH_STALE_TIME,
-        });
+    // Low priority: pages within range
+    for (let i = 2; i <= PREFETCH_RANGE; i++) {
+      const nextPage = currentPage + i;
+      const prevPage = currentPage - i;
+      if (nextPage <= totalPages) {
+        prefetchQueue.push({ page: nextPage, priority: "low" });
       }
+      if (prevPage >= 1) {
+        prefetchQueue.push({ page: prevPage, priority: "low" });
+      }
+    }
+
+    // Execute high priority first, then low priority
+    const highPriority = prefetchQueue.filter((p) => p.priority === "high");
+    const lowPriority = prefetchQueue.filter((p) => p.priority === "low");
+
+    // Immediate prefetch for high priority
+    highPriority.forEach(({ page }) => {
+      handlePrefetchPage(page, "high");
     });
-  }, [
-    metadata,
-    isLoading,
-    searchParams.page,
-    buildQueryKeyForPage,
-    queryClient,
-    fetchMangaData,
-  ]);
+
+    // Deferred prefetch for low priority (non-blocking)
+    if (lowPriority.length > 0) {
+      const timeoutId = setTimeout(() => {
+        lowPriority.forEach(({ page }) => {
+          handlePrefetchPage(page, "low");
+        });
+      }, 100);
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [metadata, isLoading, searchParams.page, handlePrefetchPage]);
 
   const paginationRef = useRef<HTMLDivElement>(null);
 
+  // Intersection observer for viewport-based prefetching
   useEffect(() => {
     if (!metadata || !paginationRef.current) return;
 
@@ -258,20 +302,27 @@ export default function Home() {
         if (entries[0]?.isIntersecting) {
           const currentPage = searchParams.page;
           const totalPages = metadata.totalPages;
-          for (let i = 1; i <= 3; i++) {
+
+          // Prefetch next 2 pages when pagination is visible
+          for (let i = 1; i <= 2; i++) {
             const nextPage = currentPage + i;
             if (nextPage <= totalPages) {
-              handlePrefetchPage(nextPage);
+              handlePrefetchPage(nextPage, "high");
             }
           }
         }
       },
-      { rootMargin: "200px", threshold: 0.1 }
+      { rootMargin: "300px", threshold: 0.1 }
     );
 
     observer.observe(paginationRef.current);
     return () => observer.disconnect();
   }, [metadata, searchParams.page, handlePrefetchPage]);
+
+  // Scroll to top when page changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [searchParams.page]);
 
   return (
     <>
@@ -302,53 +353,63 @@ export default function Home() {
         {!isLoading && data?.metaData && (
           <div
             ref={paginationRef}
-            className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row"
+            className="mt-8 flex items-center justify-center gap-2 sm:gap-4"
           >
             <Button
               variant="outline"
-              size="lg"
-              onClick={() =>
-                setSearchParams({ page: Math.max(1, searchParams.page - 1) })
-              }
-              onMouseEnter={() => handlePrefetchPage(searchParams.page - 1)}
+              size="default"
+              onClick={() => {
+                const prevPage = Math.max(1, searchParams.page - 1);
+                setSearchParams({ page: prevPage });
+              }}
+              onMouseEnter={() => {
+                if (searchParams.page > 1) {
+                  handlePrefetchPage(searchParams.page - 1, "high");
+                }
+              }}
               disabled={
                 searchParams.page === 1 || data.metaData.totalPages <= 1
               }
-              className="gap-2 min-w-[120px]"
+              className="gap-1 sm:gap-2 min-w-[80px] sm:min-w-[120px] text-xs sm:text-sm"
             >
               <ChevronLeft className="h-4 w-4" />
-              Previous
+              <span className="hidden sm:inline">Previous</span>
+              <span className="sm:hidden">Prev</span>
             </Button>
-            <div className="flex items-center gap-2 rounded-lg border bg-card px-6 py-2">
-              <span className="text-sm font-medium text-muted-foreground">
+            <div className="flex items-center gap-1 sm:gap-2 rounded-lg border bg-card px-3 sm:px-6 py-2">
+              <span className="text-xs sm:text-sm font-medium text-muted-foreground hidden sm:inline">
                 Page
               </span>
-              <span className="text-lg font-bold text-foreground">
+              <span className="text-base sm:text-lg font-bold text-foreground">
                 {searchParams.page}
               </span>
-              <span className="text-sm font-medium text-muted-foreground">
-                of {data.metaData.totalPages || 1}
+              <span className="text-xs sm:text-sm font-medium text-muted-foreground">
+                / {data.metaData.totalPages || 1}
               </span>
             </div>
             <Button
               variant="outline"
-              size="lg"
-              onClick={() =>
-                setSearchParams({
-                  page: Math.min(
-                    data.metaData.totalPages || 1,
-                    searchParams.page + 1
-                  ),
-                })
-              }
-              onMouseEnter={() => handlePrefetchPage(searchParams.page + 1)}
+              size="default"
+              onClick={() => {
+                const nextPage = Math.min(
+                  data.metaData.totalPages || 1,
+                  searchParams.page + 1
+                );
+                setSearchParams({ page: nextPage });
+              }}
+              onMouseEnter={() => {
+                if (searchParams.page < (data.metaData?.totalPages || 1)) {
+                  handlePrefetchPage(searchParams.page + 1, "high");
+                }
+              }}
               disabled={
                 searchParams.page >= data.metaData.totalPages ||
                 data.metaData.totalPages <= 1
               }
-              className="gap-2 min-w-[120px]"
+              className="gap-1 sm:gap-2 min-w-[80px] sm:min-w-[120px] text-xs sm:text-sm"
             >
-              Next
+              <span className="hidden sm:inline">Next</span>
+              <span className="sm:hidden">Next</span>
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>

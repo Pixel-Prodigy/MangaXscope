@@ -247,35 +247,105 @@ function filterByChapterCount(
 export async function getMangaList(
   params: MangaListParams = {}
 ): Promise<MangaListResponse> {
-  const searchParams = buildSearchParams(params);
-  const mangaDexResponse = await fetchMangaDexAPI(searchParams);
-
-  const mangaIds = mangaDexResponse.data.map((manga) => manga.id);
-  const statistics = await fetchMangaStatistics(mangaIds);
-
-  let mangaList = await Promise.all(
-    mangaDexResponse.data.map((manga) =>
-      transformMangaDexManga(manga, statistics)
-    )
-  );
-
-  mangaList = filterByChapterCount(
-    mangaList,
-    params.minChapters,
-    params.maxChapters
-  );
-
   const limit = Math.min(params.limit || DEFAULT_LIMIT, MAX_LIMIT);
   const offset = params.offset || 0;
-  const apiTotal = mangaDexResponse.total;
+  const hasChapterFilter = !!(params.minChapters || params.maxChapters);
+
+  if (!hasChapterFilter) {
+    // No chapter filter - use normal pagination
+    const searchParams = buildSearchParams(params);
+    const mangaDexResponse = await fetchMangaDexAPI(searchParams);
+    const apiTotal = mangaDexResponse.total;
+
+    const mangaIds = mangaDexResponse.data.map((manga) => manga.id);
+    const statistics = await fetchMangaStatistics(mangaIds);
+
+    const mangaList = await Promise.all(
+      mangaDexResponse.data.map((manga) =>
+        transformMangaDexManga(manga, statistics)
+      )
+    );
+
+    return {
+      mangaList,
+      metaData: {
+        total: apiTotal,
+        limit,
+        offset,
+        totalPages: Math.ceil(apiTotal / limit),
+      },
+    };
+  }
+
+  // Chapter filtering is active - need to fetch and filter, then paginate
+  // Fetch a large batch and filter it, then slice to the requested page
+  const batchSize = Math.min(MAX_LIMIT, 100); // Fetch up to 100 items at a time
+  let allFilteredManga: MangaListItem[] = [];
+  let currentOffset = 0;
+  let apiTotal = 0;
+  let filterRatio = 1; // Will be calculated after first batch
+
+  // Keep fetching batches until we have enough filtered items for the requested page
+  while (allFilteredManga.length < offset + limit && currentOffset < 1000) {
+    const searchParams = buildSearchParams({
+      ...params,
+      limit: batchSize,
+      offset: currentOffset,
+    });
+
+    const mangaDexResponse = await fetchMangaDexAPI(searchParams);
+
+    if (mangaDexResponse.data.length === 0) break; // No more data
+
+    apiTotal = mangaDexResponse.total;
+    const mangaIds = mangaDexResponse.data.map((manga) => manga.id);
+    const statistics = await fetchMangaStatistics(mangaIds);
+
+    let batchManga = await Promise.all(
+      mangaDexResponse.data.map((manga) =>
+        transformMangaDexManga(manga, statistics)
+      )
+    );
+
+    // Filter the batch
+    const filteredBatch = filterByChapterCount(
+      batchManga,
+      params.minChapters,
+      params.maxChapters
+    );
+
+    allFilteredManga = [...allFilteredManga, ...filteredBatch];
+
+    // Calculate filter ratio from first batch
+    if (currentOffset === 0 && mangaDexResponse.data.length > 0) {
+      filterRatio = Math.max(
+        0.01,
+        filteredBatch.length / mangaDexResponse.data.length
+      ); // Minimum 1% to avoid division issues
+    }
+
+    currentOffset += batchSize;
+
+    // If we got fewer items than requested, we might have reached the end
+    if (mangaDexResponse.data.length < batchSize) break;
+  }
+
+  // Slice to get the requested page
+  const pageManga = allFilteredManga.slice(offset, offset + limit);
+
+  // Estimate total based on filter ratio
+  const estimatedTotal = Math.max(
+    allFilteredManga.length,
+    Math.ceil(apiTotal * filterRatio)
+  );
 
   return {
-    mangaList,
+    mangaList: pageManga,
     metaData: {
-      total: apiTotal,
+      total: estimatedTotal,
       limit,
       offset,
-      totalPages: Math.ceil(apiTotal / limit),
+      totalPages: Math.ceil(estimatedTotal / limit) || 1,
     },
   };
 }

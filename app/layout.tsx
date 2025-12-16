@@ -17,6 +17,29 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "MangaHook - Discover Your Next Manga",
   description: "Browse and discover manga with advanced filtering and search",
+  icons: {
+    icon: "/manga-logo.webp",
+    apple: "/manga-logo.webp",
+  },
+  openGraph: {
+    title: "MangaHook - Discover Your Next Manga",
+    description: "Browse and discover manga with advanced filtering and search",
+    images: [
+      {
+        url: "/manga-logo.webp",
+        width: 1200,
+        height: 630,
+        alt: "MangaHook Logo",
+      },
+    ],
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "MangaHook - Discover Your Next Manga",
+    description: "Browse and discover manga with advanced filtering and search",
+    images: ["/manga-logo.webp"],
+  },
 };
 
 export default function RootLayout({

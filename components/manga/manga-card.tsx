@@ -33,17 +33,27 @@ const MangaCardComponent = function MangaCard({
   const [imageLoaded, setImageLoaded] = useState(false);
 
   const statusLabel = useMemo(() => formatStatus(manga.status), [manga.status]);
-  const statusColor = useMemo(() => getStatusColor(manga.status), [manga.status]);
+  const statusColor = useMemo(
+    () => getStatusColor(manga.status),
+    [manga.status]
+  );
   const imageUrl = useMemo(
-    () => (imageError ? PLACEHOLDER_IMAGE : getMangaImageUrl(manga.image, true)),
+    () =>
+      imageError ? PLACEHOLDER_IMAGE : getMangaImageUrl(manga.image, true),
     [manga.image, imageError]
   );
   const mangaUrl = useMemo(() => getMangaUrl(manga.id), [manga.id]);
-  const loadingStrategy = useMemo(() => getImageLoadingStrategy(index), [index]);
+  const loadingStrategy = useMemo(
+    () => getImageLoadingStrategy(index),
+    [index]
+  );
 
   const handleImageError = useCallback(() => setImageError(true), []);
   const handleImageLoad = useCallback(() => setImageLoaded(true), []);
-  const handleCardClick = useCallback(() => onCardClick?.(manga.id), [manga.id, onCardClick]);
+  const handleCardClick = useCallback(
+    () => onCardClick?.(manga.id),
+    [manga.id, onCardClick]
+  );
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLAnchorElement>) => {
       if (e.key === "Enter" || e.key === " ") {
@@ -69,7 +79,7 @@ const MangaCardComponent = function MangaCard({
         aria-describedby={`manga-${manga.id}-description`}
         itemProp="url"
       >
-        <div className="group relative h-full overflow-hidden rounded-xl bg-card shadow-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-primary/10 focus-within:ring-2 focus-within:ring-primary">
+        <div className="group relative h-full overflow-hidden rounded-xl bg-card border border-border shadow-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-primary/10 focus-within:ring-2 focus-within:ring-primary">
           <div className="relative aspect-[3/4] w-full overflow-hidden rounded-t-xl bg-gradient-to-br from-muted via-muted/50 to-muted">
             <img
               src={imageUrl}
@@ -93,7 +103,7 @@ const MangaCardComponent = function MangaCard({
             )}
 
             <div
-              className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+              className="absolute inset-0 bg-gradient-to-t from-black/40 via-black/10 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 rounded-t-xl"
               aria-hidden="true"
             />
 
@@ -110,25 +120,22 @@ const MangaCardComponent = function MangaCard({
             </div>
 
             <div
-              className="absolute bottom-0 left-0 right-0 translate-y-full bg-gradient-to-t from-black/95 via-black/85 to-transparent p-3 transition-transform duration-300 group-hover:translate-y-0"
+              className="absolute bottom-0 left-0 right-0 translate-y-full bg-linear-to-t from-black/85 via-black/60 to-transparent p-3 transition-transform duration-300 group-hover:translate-y-0 "
               aria-hidden="true"
             >
-              <h3 className="line-clamp-2 text-sm font-bold text-white drop-shadow-lg sm:text-base">
-                {manga.title}
-              </h3>
-              {manga.lastChapter && (
-                <div className="mt-2 flex items-center gap-1.5 text-xs text-white/90">
-                  <BookOpen
-                    className="h-3.5 w-3.5 shrink-0"
-                    aria-hidden="true"
-                  />
-                  <span>Chapter {manga.lastChapter}</span>
-                </div>
+              {manga.description ? (
+                <p className="line-clamp-4 text-xs leading-relaxed text-white/95 drop-shadow-lg sm:text-sm sm:leading-relaxed">
+                  {manga.description}
+                </p>
+              ) : (
+                <p className="text-xs text-white/80 italic sm:text-sm">
+                  No description available
+                </p>
               )}
             </div>
           </div>
 
-          <div className="relative bg-card p-3 sm:p-4">
+          <div className="relative bg-card p-3 sm:p-4 rounded-b-xl">
             <h3
               className="line-clamp-2 text-xs font-bold leading-snug text-foreground transition-colors group-hover:text-primary sm:text-sm"
               itemProp="name"
@@ -142,17 +149,19 @@ const MangaCardComponent = function MangaCard({
             >
               {manga.description || `Manga titled ${manga.title}`}
             </div>
-            {manga.totalChapters !== null && manga.totalChapters !== undefined && (
-              <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-muted-foreground sm:text-xs">
-                <BookOpen className="h-3 w-3 shrink-0" aria-hidden="true" />
-                <span
-                  className="truncate"
-                  aria-label={`Total chapters: ${manga.totalChapters}`}
-                >
-                  {manga.totalChapters} {manga.totalChapters === 1 ? 'chapter' : 'chapters'}
-                </span>
-              </div>
-            )}
+            {manga.totalChapters !== null &&
+              manga.totalChapters !== undefined && (
+                <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-muted-foreground sm:text-xs">
+                  <BookOpen className="h-3 w-3 shrink-0" aria-hidden="true" />
+                  <span
+                    className="truncate"
+                    aria-label={`Total chapters: ${manga.totalChapters}`}
+                  >
+                    {manga.totalChapters}{" "}
+                    {manga.totalChapters === 1 ? "chapter" : "chapters"}
+                  </span>
+                </div>
+              )}
             {manga.lastChapter && (
               <div className="mt-2 flex items-center gap-1.5 text-[10px] text-muted-foreground sm:text-xs">
                 <BookOpen className="h-3 w-3 shrink-0" aria-hidden="true" />
