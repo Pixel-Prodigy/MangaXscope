@@ -45,21 +45,21 @@ export default function MangaDetailPage() {
       window.scrollTo(0, 0);
       document.documentElement.scrollTop = 0;
       document.body.scrollTop = 0;
-      
+
       // Use requestAnimationFrame to ensure DOM is ready and prevent any scroll jumps
       requestAnimationFrame(() => {
         window.scrollTo(0, 0);
         document.documentElement.scrollTop = 0;
         document.body.scrollTop = 0;
       });
-      
+
       // Double-check after a short delay to catch any late scroll events
       const timeoutId = setTimeout(() => {
         window.scrollTo(0, 0);
         document.documentElement.scrollTop = 0;
         document.body.scrollTop = 0;
       }, 50);
-      
+
       return () => clearTimeout(timeoutId);
     }
   }, [mangaId]);
@@ -117,7 +117,7 @@ export default function MangaDetailPage() {
           transition={{ duration: 0.3 }}
           className="mb-8 grid gap-6 sm:gap-8 md:grid-cols-[280px_1fr] lg:grid-cols-[320px_1fr]"
         >
-          <div className="relative aspect-[3/4] w-full max-w-[320px] mx-auto md:mx-0 overflow-hidden rounded-2xl border-2 border-border/60 shadow-xl">
+          <div className="relative aspect-3/4 w-full max-w-[320px] mx-auto md:mx-0 overflow-hidden rounded-2xl border-2 border-border/60 shadow-xl">
             <img
               src={imageUrl}
               alt={manga.name}
@@ -162,12 +162,16 @@ export default function MangaDetailPage() {
               <div className="flex items-center gap-2.5 text-sm">
                 <User className="h-4 w-4 text-muted-foreground shrink-0" />
                 <span className="text-muted-foreground shrink-0">Author:</span>
-                <span className="font-medium truncate">{manga.author || "Unknown"}</span>
+                <span className="font-medium truncate">
+                  {manga.author || "Unknown"}
+                </span>
               </div>
               {manga.artist && manga.artist !== manga.author && (
                 <div className="flex items-center gap-2.5 text-sm">
                   <User className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <span className="text-muted-foreground shrink-0">Artist:</span>
+                  <span className="text-muted-foreground shrink-0">
+                    Artist:
+                  </span>
                   <span className="font-medium truncate">{manga.artist}</span>
                 </div>
               )}
@@ -185,14 +189,18 @@ export default function MangaDetailPage() {
               )}
               {manga.publicationDemographic && (
                 <div className="flex items-center gap-2.5 text-sm">
-                  <span className="text-muted-foreground shrink-0">Demographic:</span>
+                  <span className="text-muted-foreground shrink-0">
+                    Demographic:
+                  </span>
                   <span className="font-medium capitalize truncate">
                     {manga.publicationDemographic}
                   </span>
                 </div>
               )}
               <div className="flex items-center gap-2.5 text-sm">
-                <span className="text-muted-foreground shrink-0">Content Rating:</span>
+                <span className="text-muted-foreground shrink-0">
+                  Content Rating:
+                </span>
                 <Badge
                   variant={
                     manga.contentRating === "safe" ? "secondary" : "destructive"
@@ -213,7 +221,9 @@ export default function MangaDetailPage() {
 
             {manga.description && (
               <div>
-                <h2 className="mb-3 text-lg font-semibold sm:text-xl">Description</h2>
+                <h2 className="mb-3 text-lg font-semibold sm:text-xl">
+                  Description
+                </h2>
                 <p className="text-sm leading-relaxed text-muted-foreground sm:text-base sm:leading-relaxed">
                   {manga.description}
                 </p>

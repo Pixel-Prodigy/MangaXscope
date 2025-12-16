@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
@@ -14,6 +14,19 @@ const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
 });
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  userScalable: true,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#e5e5e5" },
+    { media: "(prefers-color-scheme: dark)", color: "#1a1a1a" },
+  ],
+  colorScheme: "dark light",
+};
 
 export const metadata: Metadata = {
   metadataBase: new URL(
@@ -39,18 +52,6 @@ export const metadata: Metadata = {
   creator: "MangaHook",
   publisher: "MangaHook",
   manifest: "/manifest.json",
-  viewport: {
-    width: "device-width",
-    initialScale: 1,
-    maximumScale: 5,
-    userScalable: true,
-    viewportFit: "cover",
-  },
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#e5e5e5" },
-    { media: "(prefers-color-scheme: dark)", color: "#1a1a1a" },
-  ],
-  colorScheme: "dark light",
   icons: {
     icon: [
       { url: "/hat.png", sizes: "any" },
