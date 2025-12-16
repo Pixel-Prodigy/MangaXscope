@@ -30,7 +30,6 @@ export function CategorySelect() {
     }
   );
 
-  // Initialize local filters from URL params
   const initializeFilters = () => {
     const filters = new Map<string, CategoryFilter>();
     categories.forEach((category) => {
@@ -49,7 +48,6 @@ export function CategorySelect() {
     initializeFilters()
   );
 
-  // Update local filters when URL params change
   useEffect(() => {
     setLocalFilters(initializeFilters());
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -75,7 +73,6 @@ export function CategorySelect() {
     });
     setLocalFilters(updated);
 
-    // Update URL params
     const include: string[] = [];
     const exclude: string[] = [];
 
