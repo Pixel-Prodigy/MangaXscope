@@ -177,7 +177,8 @@ lsof -ti:3001 | xargs kill -9
 
 **Build errors:**
 ```bash
-# Clear Next.js cache hv
+# Clear Next.js cache hvv
+
 rm -rf .next
 pnpm build
 ```
