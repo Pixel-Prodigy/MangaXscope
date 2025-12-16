@@ -149,30 +149,19 @@ const MangaCardComponent = function MangaCard({
             >
               {manga.description || `Manga titled ${manga.title}`}
             </div>
-            {manga.totalChapters !== null &&
-              manga.totalChapters !== undefined && (
-                <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-muted-foreground sm:text-xs">
-                  <BookOpen className="h-3 w-3 shrink-0" aria-hidden="true" />
-                  <span
-                    className="truncate"
-                    aria-label={`Total chapters: ${manga.totalChapters}`}
-                  >
-                    {manga.totalChapters}{" "}
-                    {manga.totalChapters === 1 ? "chapter" : "chapters"}
-                  </span>
-                </div>
-              )}
-            {manga.lastChapter && (
-              <div className="mt-2 flex items-center gap-1.5 text-[10px] text-muted-foreground sm:text-xs">
-                <BookOpen className="h-3 w-3 shrink-0" aria-hidden="true" />
-                <span
-                  className="truncate"
-                  aria-label={`Last chapter: ${manga.lastChapter}`}
-                >
-                  {formatChapter(manga.lastChapter)}
-                </span>
-              </div>
-            )}
+            <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-muted-foreground sm:text-xs">
+              <BookOpen className="h-3 w-3 shrink-0" aria-hidden="true" />
+              <span className="truncate" aria-label="Chapters">
+                {manga.totalChapters !== null &&
+                manga.totalChapters !== undefined
+                  ? `${manga.totalChapters} ${
+                      manga.totalChapters === 1 ? "chapter" : "chapters"
+                    }`
+                  : manga.lastChapter
+                    ? formatChapter(manga.lastChapter)
+                    : "-"}
+              </span>
+            </div>
           </div>
         </div>
       </Link>

@@ -39,6 +39,7 @@ export default function Home() {
       exclude: parseAsArrayOf(parseAsString),
       minChapters: parseAsString,
       maxChapters: parseAsString,
+      status: parseAsArrayOf(parseAsString),
       page: parseAsInteger.withDefault(1),
     },
     {
@@ -60,6 +61,7 @@ export default function Home() {
       q: searchParams.q,
       minChapters: searchParams.minChapters,
       maxChapters: searchParams.maxChapters,
+      status: searchParams.status,
     });
 
     if (prevFiltersRef.current && prevFiltersRef.current !== currentFilters) {
@@ -78,6 +80,7 @@ export default function Home() {
     searchParams.q,
     searchParams.minChapters,
     searchParams.maxChapters,
+    searchParams.status,
     searchParams.page,
     setSearchParams,
   ]);
@@ -125,6 +128,7 @@ export default function Home() {
       const includedTags = searchParams.include || [];
       const excludedTags = searchParams.exclude || [];
       const originalLanguage = getOriginalLanguage();
+      const status = searchParams.status || [];
 
       return getMangaList({
         limit: LIMIT,
@@ -135,6 +139,7 @@ export default function Home() {
         originalLanguage,
         minChapters: searchParams.minChapters || undefined,
         maxChapters: searchParams.maxChapters || undefined,
+        status: status.length > 0 ? status : undefined,
       });
     },
     [
@@ -145,6 +150,7 @@ export default function Home() {
       searchParams.exclude,
       searchParams.minChapters,
       searchParams.maxChapters,
+      searchParams.status,
       getOriginalLanguage,
     ]
   );
@@ -162,6 +168,7 @@ export default function Home() {
             searchParams.exclude,
             searchParams.minChapters,
             searchParams.maxChapters,
+            searchParams.status,
             searchParams.page,
           ],
     [
@@ -174,6 +181,7 @@ export default function Home() {
       searchParams.exclude,
       searchParams.minChapters,
       searchParams.maxChapters,
+      searchParams.status,
       searchParams.page,
     ]
   );
@@ -203,6 +211,7 @@ export default function Home() {
         searchParams.exclude,
         searchParams.minChapters,
         searchParams.maxChapters,
+        searchParams.status,
         page,
       ];
     },
@@ -216,6 +225,7 @@ export default function Home() {
       searchParams.exclude,
       searchParams.minChapters,
       searchParams.maxChapters,
+      searchParams.status,
     ]
   );
 
@@ -329,10 +339,10 @@ export default function Home() {
       <Navbar />
       <div className="container mx-auto min-h-screen px-4 py-6">
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center">
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             <SearchBar />
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2   min-w-0">
             <SortSelect />
             <GeneralFilterDialog />
             <GenreFilterDialog />

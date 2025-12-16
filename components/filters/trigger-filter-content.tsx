@@ -309,14 +309,14 @@ export function TriggerFilterContent({ enabled = true }: TriggerFilterContentPro
                           <Badge
                             key={tag.id}
                             variant={
-                              mode === "exclude" ? "destructive" : "secondary"
+                              mode === "exclude" ? "outline" : "secondary"
                             }
                             className={cn(
                               "cursor-pointer transition-all duration-200 hover:scale-110 active:scale-95 px-3 py-1.5 text-sm font-medium shadow-sm",
                               mode === "include" &&
                                 "bg-primary text-primary-foreground hover:bg-primary/90 shadow-md",
                               mode === "exclude" &&
-                                "bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-md",
+                                "border-destructive bg-destructive/10 text-destructive hover:bg-destructive/20 shadow-md",
                               mode === null &&
                                 "hover:bg-secondary/80 hover:shadow-md"
                             )}

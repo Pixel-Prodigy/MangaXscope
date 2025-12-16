@@ -96,10 +96,10 @@ export function CategorySelect() {
 
   return (
     <div className="space-y-3">
-      <div className="text-sm text-muted-foreground">
-        Click once to include, twice to exclude, three times to remove
+      <div className="text-xs sm:text-sm text-muted-foreground">
+        Tap once to include, twice to exclude, three times to remove
       </div>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 sm:gap-2">
         {categories.map((category) => {
           const filter = localFilters.get(category.id);
           const mode = filter?.mode || null;
@@ -107,16 +107,18 @@ export function CategorySelect() {
           return (
             <Badge
               key={category.id}
-              variant={mode === "exclude" ? "destructive" : "secondary"}
+              variant={mode === "exclude" ? "outline" : "secondary"}
               className={cn(
-                "cursor-pointer transition-all hover:scale-105 text-sm px-3 py-1.5",
+                "cursor-pointer transition-all active:scale-95 sm:hover:scale-105",
+                "text-sm sm:text-sm px-4 sm:px-3 py-2.5 sm:py-1.5",
+                "min-h-[40px] sm:min-h-0 touch-manipulation",
                 mode === "include" && "bg-primary text-primary-foreground",
-                mode === "exclude" && "bg-destructive text-destructive-foreground"
+                mode === "exclude" && "border-destructive bg-destructive/10 text-destructive"
               )}
               onClick={() => toggleCategory(category.id, category.name)}
             >
-              {mode === "include" && <Check className="mr-1 h-3 w-3" />}
-              {mode === "exclude" && <X className="mr-1 h-3 w-3" />}
+              {mode === "include" && <Check className="mr-1.5 sm:mr-1 h-3.5 w-3.5 sm:h-3 sm:w-3" />}
+              {mode === "exclude" && <X className="mr-1.5 sm:mr-1 h-3.5 w-3.5 sm:h-3 sm:w-3" />}
               {category.name}
             </Badge>
           );
@@ -137,7 +139,7 @@ export function CategorySelect() {
               excludeCategories: null,
             });
           }}
-          className="h-8 text-xs"
+          className="h-9 sm:h-8 text-xs sm:text-xs w-full sm:w-auto touch-manipulation"
         >
           Clear All
         </Button>

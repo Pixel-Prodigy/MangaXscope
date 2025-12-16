@@ -51,20 +51,20 @@ export function ChapterFilter() {
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
-        <BookOpen className="h-4 w-4 text-muted-foreground" />
-        <Label className="text-sm font-medium">Chapter Count</Label>
+        <BookOpen className="h-4 w-4 sm:h-4 sm:w-4 text-muted-foreground" />
+        <Label className="text-sm sm:text-sm font-medium">Chapter Count</Label>
         {hasActiveFilter && (
           <button
             onClick={clearFilters}
-            className="ml-auto text-xs text-muted-foreground hover:text-foreground underline"
+            className="ml-auto text-xs sm:text-xs text-muted-foreground active:text-foreground sm:hover:text-foreground underline touch-manipulation min-h-[32px] sm:min-h-0 px-2"
           >
             Clear
           </button>
         )}
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:gap-3">
         <div className="space-y-1.5">
-          <Label htmlFor="min-chapters" className="text-xs text-muted-foreground">
+          <Label htmlFor="min-chapters" className="text-xs sm:text-xs text-muted-foreground">
             Min Chapters
           </Label>
           <Input
@@ -75,11 +75,11 @@ export function ChapterFilter() {
             step="0.1"
             value={localMin}
             onChange={(e) => handleMinChange(e.target.value)}
-            className="h-9"
+            className="h-10 sm:h-9 text-base sm:text-sm"
           />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="max-chapters" className="text-xs text-muted-foreground">
+          <Label htmlFor="max-chapters" className="text-xs sm:text-xs text-muted-foreground">
             Max Chapters
           </Label>
           <Input
@@ -90,7 +90,7 @@ export function ChapterFilter() {
             step="0.1"
             value={localMax}
             onChange={(e) => handleMaxChange(e.target.value)}
-            className="h-9"
+            className="h-10 sm:h-9 text-base sm:text-sm"
           />
         </div>
       </div>

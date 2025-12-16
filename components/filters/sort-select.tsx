@@ -24,7 +24,7 @@ export function SortSelect() {
       value={sort.type}
       onValueChange={(value) => setSort({ type: value })}
     >
-      <SelectTrigger className="w-[180px]">
+      <SelectTrigger className="w-full flex-1 min-w-0">
         <SelectValue placeholder="Sort by" />
       </SelectTrigger>
       <SelectContent>
@@ -34,4 +34,3 @@ export function SortSelect() {
     </Select>
   );
 }
-

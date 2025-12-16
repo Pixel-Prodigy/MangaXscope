@@ -15,9 +15,10 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
-import { Filter, X, Check, Loader2, Search } from "lucide-react";
+import { X, Check, Loader2, Search, BookOpenIcon } from "lucide-react";
 import { useQueryStates, parseAsArrayOf, parseAsString } from "nuqs";
 import { cn } from "@/lib/utils";
+import Image from "next/image";
 
 interface MangaDexTag {
   id: string;
@@ -223,57 +224,63 @@ export function GenreFilterDialog() {
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button variant="outline" className="relative">
-          <Filter className="mr-2 h-4 w-4" />
-          Genres
+        <Button variant="outline" className="relative flex-1 min-w-0">
+          <div className="relative mr-1.5 sm:mr-2 h-4 w-4 shrink-0 overflow-hidden rounded-full">
+            <span className="flex items-center justify-center h-full w-full">
+              <BookOpenIcon className="h-4 w-4 text-muted-foreground" />
+            </span>
+          </div>
+          <span className="truncate">Genres</span>
           {activeCount > 0 && (
-            <span className="ml-2 rounded-full bg-primary px-2 py-0.5 text-xs text-primary-foreground">
+            <span className="ml-1.5 sm:ml-2 rounded-full bg-primary px-1.5 sm:px-2 py-0.5 text-xs text-primary-foreground shrink-0">
               {activeCount}
             </span>
           )}
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[85vh] max-w-4xl flex flex-col">
-        <DialogHeader>
-          <DialogTitle>Filter by Genres</DialogTitle>
-          <DialogDescription>
-            Click once to include, twice to exclude, three times to remove
+      <DialogContent className="max-h-[95vh] sm:max-h-[85vh] max-w-4xl w-[95vw] sm:w-full flex flex-col p-0 gap-0">
+        <DialogHeader className="px-4 sm:px-6 pt-4 sm:pt-6 pb-3 sm:pb-4 border-b shrink-0">
+          <DialogTitle className="text-lg sm:text-xl">
+            Filter by Genres
+          </DialogTitle>
+          <DialogDescription className="text-xs sm:text-sm">
+            Tap once to include, twice to exclude, three times to remove
           </DialogDescription>
         </DialogHeader>
 
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <div className="relative px-4 sm:px-6 pt-4 sm:pt-4 pb-3 shrink-0">
+          <Search className="absolute left-6 sm:left-9 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             type="text"
             placeholder="Search genres..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
+            className="pl-10 sm:pl-9 h-10 sm:h-9 text-base sm:text-sm"
           />
         </div>
 
-        <div className="flex gap-4 flex-1 min-h-0">
-          <ScrollArea ref={scrollAreaRef} className="flex-1 max-h-[50vh] pr-4">
+        <div className="flex gap-4 flex-1 min-h-0 overflow-hidden">
+          <ScrollArea ref={scrollAreaRef} className="flex-1 pr-2 sm:pr-4">
             {isLoadingTags ? (
-              <div className="flex items-center justify-center py-8">
+              <div className="flex items-center justify-center py-12 sm:py-8">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
             ) : availableLetters.length === 0 ? (
-              <div className="flex items-center justify-center py-8 text-muted-foreground">
+              <div className="flex items-center justify-center py-12 sm:py-8 text-muted-foreground text-sm sm:text-base">
                 No genres found matching your search
               </div>
             ) : (
-              <div className="space-y-6">
+              <div className="space-y-4 sm:space-y-6 px-4 sm:px-0 pb-4">
                 {availableLetters.map((letter) => {
                   const tags = groupedTags[letter];
                   return (
-                    <div key={letter} className="space-y-3">
-                      <div className="sticky top-0 z-10 bg-background pb-2">
-                        <h3 className="text-lg font-semibold text-primary border-b pb-1">
+                    <div key={letter} className="space-y-2 sm:space-y-3">
+                      <div className="sticky top-0 z-10 bg-background pb-2 pt-2 -mt-2">
+                        <h3 className="text-base sm:text-lg font-semibold text-primary border-b pb-1.5">
                           {letter}
                         </h3>
                       </div>
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-wrap gap-2 sm:gap-2">
                         {tags.map((tag) => {
                           const filter = localFilters.get(tag.id);
                           const mode = filter?.mode || null;
@@ -286,22 +293,24 @@ export function GenreFilterDialog() {
                             <Badge
                               key={tag.id}
                               variant={
-                                mode === "exclude" ? "destructive" : "secondary"
+                                mode === "exclude" ? "outline" : "secondary"
                               }
                               className={cn(
-                                "cursor-pointer transition-all hover:scale-105",
+                                "cursor-pointer transition-all active:scale-95 sm:hover:scale-105",
+                                "text-xs sm:text-sm px-3 sm:px-2.5 py-2 sm:py-1.5",
+                                "min-h-[36px] sm:min-h-0 touch-manipulation",
                                 mode === "include" &&
                                   "bg-primary text-primary-foreground",
                                 mode === "exclude" &&
-                                  "bg-destructive text-destructive-foreground"
+                                  "border-destructive bg-destructive/10 text-destructive"
                               )}
                               onClick={() => toggleGenre(tag.id, tagName)}
                             >
                               {mode === "include" && (
-                                <Check className="mr-1 h-3 w-3" />
+                                <Check className="mr-1.5 sm:mr-1 h-3.5 w-3.5 sm:h-3 sm:w-3" />
                               )}
                               {mode === "exclude" && (
-                                <X className="mr-1 h-3 w-3" />
+                                <X className="mr-1.5 sm:mr-1 h-3.5 w-3.5 sm:h-3 sm:w-3" />
                               )}
                               {tagName}
                             </Badge>
@@ -316,12 +325,21 @@ export function GenreFilterDialog() {
           </ScrollArea>
         </div>
 
-        <Separator />
-        <div className="flex justify-between">
-          <Button variant="outline" onClick={clearFilters}>
+        <Separator className="shrink-0" />
+        <div className="flex flex-col sm:flex-row justify-between gap-2 sm:gap-0 px-4 sm:px-6 py-3 sm:py-4 bg-muted/30 shrink-0">
+          <Button
+            variant="outline"
+            onClick={clearFilters}
+            className="w-full sm:w-auto h-11 sm:h-10 text-base sm:text-sm order-2 sm:order-1"
+          >
             Clear All
           </Button>
-          <Button onClick={applyFilters}>Apply Filters</Button>
+          <Button
+            onClick={applyFilters}
+            className="w-full sm:w-auto h-11 sm:h-10 text-base sm:text-sm order-1 sm:order-2"
+          >
+            Apply Filters
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

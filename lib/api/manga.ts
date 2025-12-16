@@ -53,7 +53,7 @@ async function fetchMangaStatistics(
 
     if (!response.ok) {
       console.warn(
-        "Failed to fetch statistics, continuing without chapter counts"
+        `Failed to fetch statistics (${response.status}), continuing without chapter counts`
       );
       return {};
     }
@@ -70,6 +70,15 @@ async function fetchMangaStatistics(
           statistics[mangaId] = { chapters: typedStats.chapters.total };
         }
       });
+    }
+
+    // Log if some mangas are missing statistics (for debugging)
+    const mangasWithStats = Object.keys(statistics).length;
+    const totalMangas = mangaIds.length;
+    if (mangasWithStats < totalMangas) {
+      console.debug(
+        `Statistics available for ${mangasWithStats}/${totalMangas} mangas. Some mangas may not have statistics in MangaDex database.`
+      );
     }
 
     return statistics;
@@ -98,6 +107,28 @@ function normalizeChapterValue(value: string | null): string | null {
   return value && value.trim() !== "" ? value : null;
 }
 
+/**
+ * Estimates total chapters from lastChapter if it's a simple numeric value.
+ * This is a fallback when statistics API doesn't provide total chapters.
+ */
+function estimateTotalChaptersFromLastChapter(
+  lastChapter: string | null
+): number | null {
+  if (!lastChapter) return null;
+  
+  // Try to parse as a simple number (e.g., "10", "100")
+  const numericValue = parseFloat(lastChapter);
+  if (!isNaN(numericValue) && numericValue > 0 && numericValue % 1 === 0) {
+    // Only use if it's a whole number and matches the string exactly
+    // (to avoid using "10.5" as 10)
+    if (lastChapter.trim() === numericValue.toString()) {
+      return Math.floor(numericValue);
+    }
+  }
+  
+  return null;
+}
+
 async function transformMangaDexManga(
   manga: MangaDexManga,
   statistics?: Record<string, { chapters: number }>
@@ -111,7 +142,12 @@ async function transformMangaDexManga(
     findRelationship(manga.relationships, "cover_art")?.id || null;
   const image = await getCoverArtUrl(manga.id, coverArtId);
   const tags = transformTags(manga.attributes.tags);
-  const totalChapters = statistics?.[manga.id]?.chapters ?? null;
+  
+  // Try to get total chapters from statistics first, fallback to estimating from lastChapter
+  const lastChapter = normalizeChapterValue(manga.attributes.lastChapter);
+  const totalChapters =
+    statistics?.[manga.id]?.chapters ??
+    estimateTotalChaptersFromLastChapter(lastChapter);
 
   return {
     id: manga.id,
@@ -125,7 +161,7 @@ async function transformMangaDexManga(
     tags,
     publicationDemographic: manga.attributes.publicationDemographic,
     originalLanguage: manga.attributes.originalLanguage,
-    lastChapter: normalizeChapterValue(manga.attributes.lastChapter),
+    lastChapter,
     lastVolume: normalizeChapterValue(manga.attributes.lastVolume),
     totalChapters,
     updatedAt: manga.attributes.updatedAt,
