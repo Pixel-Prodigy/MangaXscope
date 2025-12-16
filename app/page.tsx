@@ -376,7 +376,7 @@ export default function Home() {
               }}
               onMouseEnter={() => {
                 if (searchParams.page > 1) {
-                  handlePrefetchPage(searchParams.page - 1, "high");
+                  handlePrefetchPage(searchParams.page - 1);
                 }
               }}
               disabled={
@@ -411,7 +411,7 @@ export default function Home() {
               }}
               onMouseEnter={() => {
                 if (searchParams.page < (data.metaData?.totalPages || 1)) {
-                  handlePrefetchPage(searchParams.page + 1, "high");
+                  handlePrefetchPage(searchParams.page + 1);
                 }
               }}
               disabled={
