@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useQueryStates, parseAsString } from "nuqs";
@@ -17,16 +16,11 @@ export function ChapterFilter() {
     }
   );
 
-  const [localMin, setLocalMin] = useState(chapterFilter.minChapters || "");
-  const [localMax, setLocalMax] = useState(chapterFilter.maxChapters || "");
-
-  useEffect(() => {
-    setLocalMin(chapterFilter.minChapters || "");
-    setLocalMax(chapterFilter.maxChapters || "");
-  }, [chapterFilter.minChapters, chapterFilter.maxChapters]);
+  // Use URL params directly as the source of truth to avoid sync issues
+  const localMin = chapterFilter.minChapters || "";
+  const localMax = chapterFilter.maxChapters || "";
 
   const handleMinChange = (value: string) => {
-    setLocalMin(value);
     if (value === "") {
       setChapterFilter({ minChapters: null });
     } else {
@@ -38,7 +32,6 @@ export function ChapterFilter() {
   };
 
   const handleMaxChange = (value: string) => {
-    setLocalMax(value);
     if (value === "") {
       setChapterFilter({ maxChapters: null });
     } else {
@@ -50,8 +43,6 @@ export function ChapterFilter() {
   };
 
   const clearFilters = () => {
-    setLocalMin("");
-    setLocalMax("");
     setChapterFilter({ minChapters: null, maxChapters: null });
   };
 

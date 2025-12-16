@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import Link from "next/link";
@@ -28,7 +28,7 @@ const PLACEHOLDER_IMAGE =
 export default function MangaDetailPage() {
   const params = useParams();
   const mangaId = params.id as string;
-  const [isAndroidDevice, setIsAndroidDevice] = useState(false);
+  const [isAndroidDevice] = useState(() => isAndroid());
 
   const {
     data: manga,
@@ -39,10 +39,6 @@ export default function MangaDetailPage() {
     queryFn: () => getManga(mangaId),
     enabled: !!mangaId,
   });
-
-  useEffect(() => {
-    setIsAndroidDevice(isAndroid());
-  }, []);
 
   const handleOpenInAniyomi = () => {
     if (manga?.id) {

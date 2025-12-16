@@ -14,12 +14,20 @@ export function SearchBar() {
     { shallow: false }
   );
 
-  const [localValue, setLocalValue] = useState(search.q || "");
+  const [localValue, setLocalValue] = useState(() => search.q || "");
   const [isDebouncing, setIsDebouncing] = useState(false);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isInternalUpdateRef = useRef(false);
 
+  // Sync from URL to local state when URL changes externally (e.g., browser navigation)
+  // Using a ref to track internal updates to avoid sync loops
+  // This is a valid pattern for syncing external state (URL params) to local state for controlled inputs
   useEffect(() => {
-    setLocalValue(search.q || "");
+    if (!isInternalUpdateRef.current) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setLocalValue(search.q || "");
+    }
+    isInternalUpdateRef.current = false;
   }, [search.q]);
 
   const debouncedSetSearch = useCallback(
@@ -34,6 +42,7 @@ export function SearchBar() {
 
       debounceTimerRef.current = setTimeout(() => {
         setIsDebouncing(false);
+        isInternalUpdateRef.current = true;
         setSearch({ q: value.trim() || null });
       }, DEBOUNCE_DELAY);
     },
@@ -59,6 +68,7 @@ export function SearchBar() {
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
+    isInternalUpdateRef.current = true;
     setSearch({ q: null });
   };
 

@@ -72,13 +72,14 @@ async function fetchMangaStatistics(
     const statistics: Record<string, { chapters: number }> = {};
 
     if (data.statistics) {
-      Object.entries(data.statistics).forEach(
-        ([mangaId, stats]: [string, any]) => {
-          if (stats?.chapters?.total !== undefined) {
-            statistics[mangaId] = { chapters: stats.chapters.total };
-          }
+      Object.entries(data.statistics).forEach(([mangaId, stats]) => {
+        const typedStats = stats as
+          | { chapters?: { total?: number } }
+          | undefined;
+        if (typedStats?.chapters?.total !== undefined) {
+          statistics[mangaId] = { chapters: typedStats.chapters.total };
         }
-      );
+      });
     }
 
     return statistics;
@@ -386,8 +387,8 @@ export async function searchManga(
 }
 
 export async function getChapter(
-  mangaId: string,
-  chapterId: string
+  _mangaId: string,
+  _chapterId: string
 ): Promise<ChapterData> {
   throw new Error("Chapter fetching not yet implemented with MangaDex API");
 }

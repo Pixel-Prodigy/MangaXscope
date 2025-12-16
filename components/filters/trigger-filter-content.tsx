@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { X, Check, Loader2, Search } from "lucide-react";
 import { useQueryStates, parseAsArrayOf, parseAsString } from "nuqs";
 import { cn } from "@/lib/utils";
@@ -68,11 +69,14 @@ export function TriggerFilterContent({ enabled = true }: TriggerFilterContentPro
     });
 
   // Filter to only genre and theme tags
-  const availableTags =
-    tagsData?.data.filter(
-      (tag) =>
-        tag.attributes.group === "genre" || tag.attributes.group === "theme"
-    ) || [];
+  const availableTags = useMemo(
+    () =>
+      tagsData?.data.filter(
+        (tag) =>
+          tag.attributes.group === "genre" || tag.attributes.group === "theme"
+      ) || [],
+    [tagsData?.data]
+  );
 
   // Group tags by first letter and filter by search query
   const groupedTags = useMemo(() => {

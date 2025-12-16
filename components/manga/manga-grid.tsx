@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useMemo } from "react";
+import { memo } from "react";
 import { MangaCard } from "./manga-card";
 import type { MangaListItem } from "@/lib/api/types";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -81,15 +81,10 @@ const MangaGridComponent = function MangaGrid({
   mangas,
   isLoading = false,
   className,
-  skeletonCount = DEFAULT_SKELETON_COUNT,
+  skeletonCount: _skeletonCount = DEFAULT_SKELETON_COUNT,
   onCardClick,
   emptyMessage = DEFAULT_EMPTY_MESSAGE,
 }: MangaGridProps) {
-  const skeletonItems = useMemo(
-    () => Array.from({ length: skeletonCount }, (_, i) => i),
-    [skeletonCount]
-  );
-
   if (isLoading) {
     return (
       <div

@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { Eye } from "lucide-react";
 import { ThemeToggle } from "./theme-toggle";
 import { MainLogo } from "./ui/main-logo";
 

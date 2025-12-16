@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Dialog,
@@ -72,11 +72,14 @@ export function GenreFilterDialog() {
       enabled: open,
     });
 
-  const availableTags =
-    tagsData?.data.filter(
-      (tag) =>
-        tag.attributes.group === "genre" || tag.attributes.group === "theme"
-    ) || [];
+  const availableTags = useMemo(
+    () =>
+      tagsData?.data.filter(
+        (tag) =>
+          tag.attributes.group === "genre" || tag.attributes.group === "theme"
+      ) || [],
+    [tagsData?.data]
+  );
 
   const groupedTags = useMemo(() => {
     const filtered = availableTags.filter((tag) => {
@@ -120,44 +123,47 @@ export function GenreFilterDialog() {
     return letters;
   }, [groupedTags]);
 
-  const initializeFilters = () => {
+  const initializeFilters = useMemo(() => {
     const filters = new Map<string, GenreFilter>();
-    availableTags.forEach((tag) => {
-      const isIncluded = includeGenres.include.includes(tag.id);
-      const isExcluded = includeGenres.exclude.includes(tag.id);
-      const tagName =
-        tag.attributes.name.en ||
-        Object.values(tag.attributes.name)[0] ||
-        "Unknown";
-      filters.set(tag.id, {
-        id: tag.id,
-        name: tagName,
-        mode: isIncluded ? "include" : isExcluded ? "exclude" : null,
+    if (availableTags.length > 0) {
+      availableTags.forEach((tag) => {
+        const isIncluded = includeGenres.include.includes(tag.id);
+        const isExcluded = includeGenres.exclude.includes(tag.id);
+        const tagName =
+          tag.attributes.name.en ||
+          Object.values(tag.attributes.name)[0] ||
+          "Unknown";
+        filters.set(tag.id, {
+          id: tag.id,
+          name: tagName,
+          mode: isIncluded ? "include" : isExcluded ? "exclude" : null,
+        });
       });
-    });
+    }
     return filters;
-  };
+  }, [availableTags, includeGenres.include, includeGenres.exclude]);
 
   const [localFilters, setLocalFilters] = useState<Map<string, GenreFilter>>(
-    new Map()
+    () => initializeFilters
   );
 
+  // Reset filters when dialog opens and tags are available
+  // Using useEffect to sync external state (URL params) to local state when dialog opens
+  // This is a valid pattern for syncing external state to local state for controlled inputs
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     if (open && availableTags.length > 0) {
-      setLocalFilters(initializeFilters());
+      setLocalFilters(new Map(initializeFilters));
     }
-  }, [
-    open,
-    availableTags.length,
-    includeGenres.include,
-    includeGenres.exclude,
-  ]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, availableTags.length]);
 
-  useEffect(() => {
-    if (!open) {
+  const handleOpenChange = (newOpen: boolean) => {
+    setOpen(newOpen);
+    if (!newOpen) {
       setSearchQuery("");
     }
-  }, [open]);
+  };
 
   const toggleGenre = (tagId: string, tagName: string) => {
     const current = localFilters.get(tagId);
@@ -213,7 +219,7 @@ export function GenreFilterDialog() {
   ).length;
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button variant="outline" className="relative">
           <Filter className="mr-2 h-4 w-4" />
