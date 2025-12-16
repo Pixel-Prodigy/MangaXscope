@@ -18,7 +18,6 @@ import { Input } from "@/components/ui/input";
 import { X, Check, Loader2, Search, BookOpenIcon } from "lucide-react";
 import { useQueryStates, parseAsArrayOf, parseAsString } from "nuqs";
 import { cn } from "@/lib/utils";
-import Image from "next/image";
 
 interface MangaDexTag {
   id: string;
@@ -153,7 +152,6 @@ export function GenreFilterDialog() {
   // Reset filters when dialog opens and tags are available
   // Using useEffect to sync external state (URL params) to local state when dialog opens
   // This is a valid pattern for syncing external state to local state for controlled inputs
-  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     if (open && availableTags.length > 0) {
       setLocalFilters(new Map(initializeFilters));

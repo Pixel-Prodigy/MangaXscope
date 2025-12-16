@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Check, X } from "lucide-react";
+import { Check } from "lucide-react";
 import { useQueryStates, parseAsArrayOf, parseAsString } from "nuqs";
 import { cn } from "@/lib/utils";
 

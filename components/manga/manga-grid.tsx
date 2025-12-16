@@ -81,7 +81,6 @@ const MangaGridComponent = function MangaGrid({
   mangas,
   isLoading = false,
   className,
-  skeletonCount: _skeletonCount = DEFAULT_SKELETON_COUNT,
   onCardClick,
   emptyMessage = DEFAULT_EMPTY_MESSAGE,
 }: MangaGridProps) {
