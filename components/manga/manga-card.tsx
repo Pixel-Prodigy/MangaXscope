@@ -17,32 +17,12 @@ import {
 } from "@/lib/manga-utils";
 
 export interface MangaCardProps {
-  /** Manga data to display */
   manga: MangaListItem;
-  /** Optional index for list rendering optimization */
   index?: number;
-  /** Optional custom className for the card container */
   className?: string;
-  /** Optional callback when card is clicked */
   onCardClick?: (mangaId: string) => void;
 }
 
-/**
- * MangaCard - A reusable, optimized card component for displaying manga items
- *
- * Features:
- * - Memoized for performance optimization
- * - Fully accessible with ARIA labels
- * - Image error handling with fallback
- * - Responsive design
- * - Smooth animations and hover effects
- * - SEO-friendly with proper semantic HTML
- *
- * @example
- * ```tsx
- * <MangaCard manga={mangaData} index={0} />
- * ```
- */
 const MangaCardComponent = function MangaCard({
   manga,
   index,
@@ -52,36 +32,18 @@ const MangaCardComponent = function MangaCard({
   const [imageError, setImageError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
 
-  // Memoize computed values
   const statusLabel = useMemo(() => formatStatus(manga.status), [manga.status]);
-  const statusColor = useMemo(
-    () => getStatusColor(manga.status),
-    [manga.status]
-  );
+  const statusColor = useMemo(() => getStatusColor(manga.status), [manga.status]);
   const imageUrl = useMemo(
-    () =>
-      imageError ? PLACEHOLDER_IMAGE : getMangaImageUrl(manga.image, true),
+    () => (imageError ? PLACEHOLDER_IMAGE : getMangaImageUrl(manga.image, true)),
     [manga.image, imageError]
   );
   const mangaUrl = useMemo(() => getMangaUrl(manga.id), [manga.id]);
-  const loadingStrategy = useMemo(
-    () => getImageLoadingStrategy(index),
-    [index]
-  );
+  const loadingStrategy = useMemo(() => getImageLoadingStrategy(index), [index]);
 
-  // Event handlers
-  const handleImageError = useCallback(() => {
-    setImageError(true);
-  }, []);
-
-  const handleImageLoad = useCallback(() => {
-    setImageLoaded(true);
-  }, []);
-
-  const handleCardClick = useCallback(() => {
-    onCardClick?.(manga.id);
-  }, [manga.id, onCardClick]);
-
+  const handleImageError = useCallback(() => setImageError(true), []);
+  const handleImageLoad = useCallback(() => setImageLoaded(true), []);
+  const handleCardClick = useCallback(() => onCardClick?.(manga.id), [manga.id, onCardClick]);
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLAnchorElement>) => {
       if (e.key === "Enter" || e.key === " ") {
@@ -108,7 +70,6 @@ const MangaCardComponent = function MangaCard({
         itemProp="url"
       >
         <div className="group relative h-full overflow-hidden rounded-xl bg-card shadow-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-primary/10 focus-within:ring-2 focus-within:ring-primary">
-          {/* Image Container */}
           <div className="relative aspect-[3/4] w-full overflow-hidden rounded-t-xl bg-gradient-to-br from-muted via-muted/50 to-muted">
             <img
               src={imageUrl}
@@ -127,18 +88,15 @@ const MangaCardComponent = function MangaCard({
               itemProp="image"
             />
 
-            {/* Loading placeholder */}
             {!imageLoaded && (
               <div className="absolute inset-0 animate-pulse bg-muted" />
             )}
 
-            {/* Gradient Overlay on Hover */}
             <div
               className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"
               aria-hidden="true"
             />
 
-            {/* Status Badge */}
             <div className="absolute top-2 right-2 z-10" aria-hidden="true">
               <Badge
                 className={cn(
@@ -151,7 +109,6 @@ const MangaCardComponent = function MangaCard({
               </Badge>
             </div>
 
-            {/* Hover Overlay Info */}
             <div
               className="absolute bottom-0 left-0 right-0 translate-y-full bg-gradient-to-t from-black/95 via-black/85 to-transparent p-3 transition-transform duration-300 group-hover:translate-y-0"
               aria-hidden="true"
@@ -171,7 +128,6 @@ const MangaCardComponent = function MangaCard({
             </div>
           </div>
 
-          {/* Card Content */}
           <div className="relative bg-card p-3 sm:p-4">
             <h3
               className="line-clamp-2 text-xs font-bold leading-snug text-foreground transition-colors group-hover:text-primary sm:text-sm"
