@@ -22,57 +22,84 @@
 
 ## Features
 
--📚 get all manga <br/>
--ℹ️ get single manga detail <br/>
--📖 get chapter list including images <br/>
--🔍 search support <br/>
--🔥 Nextjs exemple with ready to use hooks <br/>
+- 📚 Get all manga with filtering and pagination
+- ℹ️ Get single manga detail with chapter list
+- 📖 Get chapter list including images
+- 🔍 Advanced search support
+- 🎨 Modern Next.js frontend with 3 beautiful themes
+- ⚡ Fast performance with React Query and optimizations
+- 📱 Fully responsive design
+- 🎭 Smooth animations and micro-interactions
 
-## Quick start
+## 🚀 Quick Start
 
-Follow these simple steps to get Manga Hook up and running on your local machine:
+### Backend Server Setup
 
-### 1.  **Clone the Repository:**
+1. **Navigate to the server directory:**
+   ```bash
+   cd server
+   ```
 
-Open your terminal and run the following command to clone the Manga Hook repository:
+2. **Install dependencies:**
+   ```bash
+   npm install
+   # or
+   pnpm install
+   ```
 
-Terminal window
+3. **Create environment file:**
+   ```bash
+   cp .env.example .env
+   ```
+   
+   Edit `.env` and set:
+   ```env
+   PORT=3000
+   ```
 
-```bash
-git  clone  https://github.com/kiraaziz/mangahook-api
-```
+4. **Start the server:**
+   ```bash
+   npm start
+   # or
+   pnpm start
+   ```
+   
+   The server will run on **http://localhost:3000**
 
-### 2.  **Navigate to the Server Directory:**
+### Frontend Application Setup
 
-Change your working directory to the server folder:
+1. **Navigate to the frontend directory (in a new terminal):**
+   ```bash
+   cd next-app
+   ```
 
-Terminal window
+2. **Install dependencies:**
+   ```bash
+   pnpm install
+   # or
+   npm install
+   ```
 
-```bash
-cd  server
-```
+3. **Create environment file:**
+   ```bash
+   cp .env.example .env.local
+   ```
+   
+   Edit `.env.local`:
+   ```env
+   NEXT_PUBLIC_API_URL=http://localhost:3000
+   ```
 
-### 3.  **Install Dependencies:**
+4. **Start the frontend:**
+   ```bash
+   pnpm dev
+   # or
+   npm run dev
+   ```
+   
+   The frontend will run on **http://localhost:3001**
 
-Install the required dependencies using npm:
-
-Terminal window
-
-```bash
-npm  install
-```
-
-### 4.  **Start the Express Server:**
-
-Launch the Manga Hook server by running the following command:
-
-Terminal window
-
-```bash
-npm  run  start
-```
-
-This will start the server on port 3000.
+> 📖 **For detailed setup instructions, see [SETUP.md](./SETUP.md)**
 
 Now that Manga Hook is running, let’s explore how to retrieve manga data.
 
