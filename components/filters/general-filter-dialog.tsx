@@ -35,7 +35,6 @@ export function GeneralFilterDialog() {
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
-          {/* Category Filter Section */}
           <Card className="border-2 shadow-sm hover:shadow-md transition-shadow">
             <CardHeader className="pb-3">
               <CardTitle className="text-base font-semibold">Category</CardTitle>
@@ -45,7 +44,6 @@ export function GeneralFilterDialog() {
             </CardContent>
           </Card>
 
-          {/* Chapter Filter Section */}
           <Card className="border-2 shadow-sm hover:shadow-md transition-shadow">
             <CardHeader className="pb-3">
               <CardTitle className="text-base font-semibold">Chapter Range</CardTitle>
