@@ -16,7 +16,7 @@ interface ThemeProviderState {
 }
 
 const initialState: ThemeProviderState = {
-  theme: "manga",
+  theme: "dark",
   setTheme: () => null,
 };
 
@@ -24,7 +24,7 @@ const ThemeProviderContext = createContext<ThemeProviderState>(initialState);
 
 export function ThemeProvider({
   children,
-  defaultTheme = "manga",
+  defaultTheme = "dark",
   storageKey = "manga-ui-theme",
   ...props
 }: ThemeProviderProps) {

@@ -128,17 +128,12 @@ const MangaGridComponent = function MangaGrid({
   if (isLoading) {
     return (
       <div
-        className={cn(
-          "grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6",
-          className
-        )}
+        className="flex min-h-[400px] items-center justify-center"
         role="status"
         aria-label="Loading mangas"
         aria-live="polite"
       >
-        {skeletonItems.map((index) => (
-          <MangaSkeleton key={`skeleton-${index}`} />
-        ))}
+        <img src="/loading.gif" alt="Loading" className="w-56" />
       </div>
     );
   }

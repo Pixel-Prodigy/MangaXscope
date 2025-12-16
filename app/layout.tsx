@@ -29,7 +29,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <ThemeProvider defaultTheme="manga" storageKey="manga-ui-theme">
+        <ThemeProvider defaultTheme="dark" storageKey="manga-ui-theme">
           <Providers>{children}</Providers>
         </ThemeProvider>
       </body>

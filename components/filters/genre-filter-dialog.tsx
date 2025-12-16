@@ -56,41 +56,49 @@ export function GenreFilterDialog() {
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-  const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   // Fetch available tags from MangaDex
-  const { data: tagsData, isLoading: isLoadingTags } = useQuery<MangaDexTagsResponse>({
-    queryKey: ["mangadex-tags"],
-    queryFn: async () => {
-      const response = await fetch("https://api.mangadex.org/manga/tag", {
-        cache: "force-cache",
-      });
-      if (!response.ok) {
-        throw new Error("Failed to fetch tags");
-      }
-      return response.json();
-    },
-    enabled: open, // Only fetch when dialog is open
-  });
+  const { data: tagsData, isLoading: isLoadingTags } =
+    useQuery<MangaDexTagsResponse>({
+      queryKey: ["mangadex-tags"],
+      queryFn: async () => {
+        const response = await fetch("https://api.mangadex.org/manga/tag", {
+          cache: "force-cache",
+        });
+        if (!response.ok) {
+          throw new Error("Failed to fetch tags");
+        }
+        return response.json();
+      },
+      enabled: open, // Only fetch when dialog is open
+    });
 
   // Filter to only genre and theme tags
-  const availableTags = tagsData?.data.filter(
-    (tag) => tag.attributes.group === "genre" || tag.attributes.group === "theme"
-  ) || [];
+  const availableTags =
+    tagsData?.data.filter(
+      (tag) =>
+        tag.attributes.group === "genre" || tag.attributes.group === "theme"
+    ) || [];
 
   // Group tags by first letter and filter by search query
   const groupedTags = useMemo(() => {
     const filtered = availableTags.filter((tag) => {
-      const tagName = tag.attributes.name.en || Object.values(tag.attributes.name)[0] || "Unknown";
+      const tagName =
+        tag.attributes.name.en ||
+        Object.values(tag.attributes.name)[0] ||
+        "Unknown";
       return tagName.toLowerCase().includes(searchQuery.toLowerCase());
     });
 
     const grouped: Record<string, typeof availableTags> = {};
     filtered.forEach((tag) => {
-      const tagName = tag.attributes.name.en || Object.values(tag.attributes.name)[0] || "Unknown";
+      const tagName =
+        tag.attributes.name.en ||
+        Object.values(tag.attributes.name)[0] ||
+        "Unknown";
       const firstLetter = tagName.charAt(0).toUpperCase();
       const letter = /[A-Z]/.test(firstLetter) ? firstLetter : "#";
-      
+
       if (!grouped[letter]) {
         grouped[letter] = [];
       }
@@ -100,8 +108,10 @@ export function GenreFilterDialog() {
     // Sort tags within each group
     Object.keys(grouped).forEach((letter) => {
       grouped[letter].sort((a, b) => {
-        const nameA = a.attributes.name.en || Object.values(a.attributes.name)[0] || "";
-        const nameB = b.attributes.name.en || Object.values(b.attributes.name)[0] || "";
+        const nameA =
+          a.attributes.name.en || Object.values(a.attributes.name)[0] || "";
+        const nameB =
+          b.attributes.name.en || Object.values(b.attributes.name)[0] || "";
         return nameA.localeCompare(nameB);
       });
     });
@@ -115,32 +125,16 @@ export function GenreFilterDialog() {
     return letters;
   }, [groupedTags]);
 
-  // Scroll to a specific letter section
-  const scrollToLetter = (letter: string) => {
-    const element = sectionRefs.current[letter];
-    if (element && scrollAreaRef.current) {
-      const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
-      if (scrollContainer) {
-        const containerRect = scrollContainer.getBoundingClientRect();
-        const elementRect = element.getBoundingClientRect();
-        const scrollTop = scrollContainer.scrollTop;
-        const targetScrollTop = scrollTop + elementRect.top - containerRect.top - 20;
-        
-        scrollContainer.scrollTo({
-          top: targetScrollTop,
-          behavior: "smooth",
-        });
-      }
-    }
-  };
-
   // Initialize local filters from URL params
   const initializeFilters = () => {
     const filters = new Map<string, GenreFilter>();
     availableTags.forEach((tag) => {
       const isIncluded = includeGenres.include.includes(tag.id);
       const isExcluded = includeGenres.exclude.includes(tag.id);
-      const tagName = tag.attributes.name.en || Object.values(tag.attributes.name)[0] || "Unknown";
+      const tagName =
+        tag.attributes.name.en ||
+        Object.values(tag.attributes.name)[0] ||
+        "Unknown";
       filters.set(tag.id, {
         id: tag.id,
         name: tagName,
@@ -160,7 +154,12 @@ export function GenreFilterDialog() {
       setLocalFilters(initializeFilters());
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, availableTags.length, includeGenres.include, includeGenres.exclude]);
+  }, [
+    open,
+    availableTags.length,
+    includeGenres.include,
+    includeGenres.exclude,
+  ]);
 
   // Reset search when dialog closes
   useEffect(() => {
@@ -218,8 +217,9 @@ export function GenreFilterDialog() {
     setIncludeGenres({ include: null, exclude: null });
   };
 
-  const activeCount =
-    Array.from(localFilters.values()).filter((f) => f.mode !== null).length;
+  const activeCount = Array.from(localFilters.values()).filter(
+    (f) => f.mode !== null
+  ).length;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -241,7 +241,7 @@ export function GenreFilterDialog() {
             Click once to include, twice to exclude, three times to remove
           </DialogDescription>
         </DialogHeader>
-        
+
         {/* Search Input */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -270,13 +270,7 @@ export function GenreFilterDialog() {
                 {availableLetters.map((letter) => {
                   const tags = groupedTags[letter];
                   return (
-                    <div
-                      key={letter}
-                      ref={(el) => {
-                        sectionRefs.current[letter] = el;
-                      }}
-                      className="space-y-3"
-                    >
+                    <div key={letter} className="space-y-3">
                       <div className="sticky top-0 z-10 bg-background pb-2">
                         <h3 className="text-lg font-semibold text-primary border-b pb-1">
                           {letter}
@@ -286,21 +280,32 @@ export function GenreFilterDialog() {
                         {tags.map((tag) => {
                           const filter = localFilters.get(tag.id);
                           const mode = filter?.mode || null;
-                          const tagName = tag.attributes.name.en || Object.values(tag.attributes.name)[0] || "Unknown";
+                          const tagName =
+                            tag.attributes.name.en ||
+                            Object.values(tag.attributes.name)[0] ||
+                            "Unknown";
 
                           return (
                             <Badge
                               key={tag.id}
-                              variant={mode === "exclude" ? "destructive" : "secondary"}
+                              variant={
+                                mode === "exclude" ? "destructive" : "secondary"
+                              }
                               className={cn(
                                 "cursor-pointer transition-all hover:scale-105",
-                                mode === "include" && "bg-primary text-primary-foreground",
-                                mode === "exclude" && "bg-destructive text-destructive-foreground"
+                                mode === "include" &&
+                                  "bg-primary text-primary-foreground",
+                                mode === "exclude" &&
+                                  "bg-destructive text-destructive-foreground"
                               )}
                               onClick={() => toggleGenre(tag.id, tagName)}
                             >
-                              {mode === "include" && <Check className="mr-1 h-3 w-3" />}
-                              {mode === "exclude" && <X className="mr-1 h-3 w-3" />}
+                              {mode === "include" && (
+                                <Check className="mr-1 h-3 w-3" />
+                              )}
+                              {mode === "exclude" && (
+                                <X className="mr-1 h-3 w-3" />
+                              )}
                               {tagName}
                             </Badge>
                           );
@@ -312,30 +317,6 @@ export function GenreFilterDialog() {
               </div>
             )}
           </ScrollArea>
-
-          {/* Alphabetical Navigation Sidebar */}
-          {!isLoadingTags && availableLetters.length > 0 && (
-            <div className="flex flex-col gap-1 border-l pl-4">
-              <div className="text-xs font-medium text-muted-foreground mb-2 sticky top-0 bg-background pb-1">
-                Jump to
-              </div>
-              <ScrollArea className="h-full max-h-[50vh]">
-                <div className="flex flex-col gap-1">
-                  {availableLetters.map((letter) => (
-                    <Button
-                      key={letter}
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 p-0 text-xs font-medium hover:bg-primary hover:text-primary-foreground"
-                      onClick={() => scrollToLetter(letter)}
-                    >
-                      {letter}
-                    </Button>
-                  ))}
-                </div>
-              </ScrollArea>
-            </div>
-          )}
         </div>
 
         <Separator />
@@ -349,4 +330,3 @@ export function GenreFilterDialog() {
     </Dialog>
   );
 }
-

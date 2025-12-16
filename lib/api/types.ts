@@ -115,6 +115,7 @@ export interface MangaListItem {
   originalLanguage: string;
   lastChapter: string | null;
   lastVolume: string | null;
+  totalChapters: number | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -187,7 +188,10 @@ export interface MangaListParams {
   excludedTags?: string[];
   status?: string[];
   publicationDemographic?: string[];
+  originalLanguage?: string[];
   order?: Record<string, string>;
+  minChapters?: string;
+  maxChapters?: string;
 }
 
 export interface SearchParams {
