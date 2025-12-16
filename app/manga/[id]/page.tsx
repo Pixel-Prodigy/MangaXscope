@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import { useEffect } from "react";
 import { motion } from "framer-motion";
 import { getManga } from "@/lib/api/manga";
 import { Button } from "@/components/ui/button";
@@ -37,29 +38,43 @@ export default function MangaDetailPage() {
     enabled: !!mangaId,
   });
 
+  // Reset scroll position when navigating to this page
+  useEffect(() => {
+    // Use requestAnimationFrame to ensure DOM is ready
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, behavior: "instant" });
+    });
+  }, [mangaId]);
+
   if (isLoading) {
     return (
-      <div className="fixed inset-0 z-50 flex h-screen w-screen items-center justify-center bg-background/80 backdrop-blur-xl">
-        <img src="/loading.gif" alt="Loading" className="w-56" />
-      </div>
+      <>
+        <Navbar />
+        <div className="flex min-h-screen w-full items-center justify-center bg-background/80 backdrop-blur-xl">
+          <img src="/loading.gif" alt="Loading" className="w-56" />
+        </div>
+      </>
     );
   }
 
   if (error || !manga) {
     return (
-      <div className="container mx-auto min-h-screen px-4 py-8">
-        <div className="rounded-lg border border-destructive bg-destructive/10 p-8 text-center">
-          <p className="mb-2 text-lg font-semibold text-destructive">
-            Error loading manga
-          </p>
-          <p className="mb-4 text-sm text-muted-foreground">
-            {error instanceof Error ? error.message : "Manga not found"}
-          </p>
-          <Link href="/">
-            <Button variant="outline">Go Back Home</Button>
-          </Link>
+      <>
+        <Navbar />
+        <div className="container mx-auto min-h-screen px-4 py-8">
+          <div className="rounded-lg border border-destructive bg-destructive/10 p-8 text-center">
+            <p className="mb-2 text-lg font-semibold text-destructive">
+              Error loading manga
+            </p>
+            <p className="mb-4 text-sm text-muted-foreground">
+              {error instanceof Error ? error.message : "Manga not found"}
+            </p>
+            <Link href="/">
+              <Button variant="outline">Go Back Home</Button>
+            </Link>
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
@@ -78,10 +93,10 @@ export default function MangaDetailPage() {
 
         {/* Hero Section */}
         <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.2, ease: "easeOut" }}
-          className="mb-6 sm:mb-8 grid gap-4 sm:gap-6 md:grid-cols-[300px_1fr]"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3 }}
+          className="mb-8 grid gap-6 md:grid-cols-[300px_1fr]"
         >
           <div className="relative aspect-[3/4] w-full overflow-hidden rounded-lg border-2 shadow-lg">
             <img
@@ -210,9 +225,9 @@ export default function MangaDetailPage() {
 
         {manga.tags.length > 0 && (
           <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.2, ease: "easeOut" }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.3, delay: 0.1 }}
           >
             <Card>
               <CardHeader>

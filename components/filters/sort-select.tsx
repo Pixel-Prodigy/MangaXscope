@@ -8,7 +8,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useQueryStates, parseAsString } from "nuqs";
-import { Button } from "../ui/button";
 
 export function SortSelect() {
   const [sort, setSort] = useQueryStates(
@@ -25,7 +24,7 @@ export function SortSelect() {
       value={sort.type}
       onValueChange={(value) => setSort({ type: value })}
     >
-      <SelectTrigger className="relative flex-1 min-w-0 min-h-[44px] sm:min-h-[36px]">
+      <SelectTrigger className="w-full flex-1 min-w-0">
         <SelectValue placeholder="Sort by" />
       </SelectTrigger>
       <SelectContent>

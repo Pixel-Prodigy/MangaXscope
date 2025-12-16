@@ -71,12 +71,13 @@ export function OpenInAniyomiButton({
   size = "lg",
   showHelperText = true,
 }: OpenInAniyomiButtonProps) {
-  const [isAndroidDevice, setIsAndroidDevice] = useState(false);
-
-  useEffect(() => {
-    // Check on client side only
-    setIsAndroidDevice(isAndroid());
-  }, []);
+  // Initialize state directly to avoid setState in effect
+  const [isAndroidDevice] = useState(() => {
+    if (typeof window !== "undefined") {
+      return isAndroid();
+    }
+    return false;
+  });
 
   const handleClick = () => {
     if (!mangaId) {

@@ -156,21 +156,31 @@
     @apply border-border outline-ring/50;
   }
   html {
-    overflow-y: scroll;
+    overflow-y: auto;
+    scroll-behavior: smooth;
   }
 
   body {
     @apply bg-background text-foreground;
     @apply transition-colors duration-300;
     overflow-x: hidden;
+    position: relative;
   }
-  
+
   .manga body {
-    background: linear-gradient(135deg, oklch(0.98 0.01 280) 0%, oklch(0.99 0.005 300) 100%);
+    background: linear-gradient(
+      135deg,
+      oklch(0.98 0.01 280) 0%,
+      oklch(0.99 0.005 300) 100%
+    );
   }
-  
+
   .dark body {
-    background: linear-gradient(135deg, oklch(0.145 0 0) 0%, oklch(0.18 0.01 280) 100%);
+    background: linear-gradient(
+      135deg,
+      oklch(0.145 0 0) 0%,
+      oklch(0.18 0.01 280) 100%
+    );
   }
 
   /* Clean, minimal scrollbars - hidden by default, appear on hover */
@@ -245,11 +255,11 @@
   .gradient-text {
     @apply bg-gradient-to-r from-primary via-primary/80 to-primary bg-clip-text text-transparent;
   }
-  
+
   .glass-effect {
     @apply backdrop-blur-md bg-background/80 border border-border/50;
   }
-  
+
   .shimmer {
     background: linear-gradient(
       90deg,
@@ -259,7 +269,7 @@
     );
     animation: shimmer 2s infinite;
   }
-  
+
   @keyframes shimmer {
     0% {
       transform: translateX(-100%);

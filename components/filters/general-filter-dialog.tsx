@@ -22,7 +22,7 @@ export function GeneralFilterDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" className="relative flex-1 min-w-0 min-h-[44px] sm:min-h-[36px]">
+        <Button variant="outline" className="relative flex-1 min-w-0">
           <Filter className="mr-1.5 sm:mr-2 h-4 w-4 shrink-0" />
           <span className="truncate">General Filter</span>
         </Button>

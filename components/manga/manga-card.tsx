@@ -72,24 +72,20 @@ const MangaCardComponent = function MangaCard({
     >
       <Link
         href={mangaUrl}
-        prefetch={true}
-        className="block h-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-xl touch-manipulation"
-        onClick={(e) => {
-          handleCardClick();
-          // Don't prevent default - let Next.js handle navigation immediately
-        }}
+        className="block h-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-xl"
+        onClick={handleCardClick}
         onKeyDown={handleKeyDown}
         aria-label={`View ${manga.title} manga details`}
         aria-describedby={`manga-${manga.id}-description`}
         itemProp="url"
       >
-        <div className="group relative h-full overflow-hidden rounded-xl bg-card border border-border shadow-sm transition-all duration-200 hover:scale-[1.02] hover:shadow-2xl hover:shadow-primary/10 focus-within:ring-2 focus-within:ring-primary active:scale-[0.98]">
+        <div className="group relative h-full overflow-hidden rounded-xl bg-card border border-border shadow-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-primary/10 focus-within:ring-2 focus-within:ring-primary">
           <div className="relative aspect-[3/4] w-full overflow-hidden rounded-t-xl bg-gradient-to-br from-muted via-muted/50 to-muted">
             <img
               src={imageUrl}
               alt={`${manga.title} cover image`}
               className={cn(
-                "h-full w-full object-cover transition-all duration-300 group-hover:scale-110",
+                "h-full w-full object-cover transition-all duration-700 group-hover:scale-110",
                 !imageLoaded && "opacity-0",
                 imageLoaded && "opacity-100"
               )}
@@ -107,7 +103,7 @@ const MangaCardComponent = function MangaCard({
             )}
 
             <div
-              className="absolute inset-0 bg-gradient-to-t from-black/40 via-black/10 to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100 rounded-t-xl"
+              className="absolute inset-0 bg-gradient-to-t from-black/40 via-black/10 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 rounded-t-xl"
               aria-hidden="true"
             />
 
@@ -124,7 +120,7 @@ const MangaCardComponent = function MangaCard({
             </div>
 
             <div
-              className="absolute bottom-0 left-0 right-0 translate-y-full bg-linear-to-t from-black/85 via-black/60 to-transparent p-3 transition-transform duration-200 group-hover:translate-y-0 "
+              className="absolute bottom-0 left-0 right-0 translate-y-full bg-linear-to-t from-black/85 via-black/60 to-transparent p-3 transition-transform duration-300 group-hover:translate-y-0 "
               aria-hidden="true"
             >
               {manga.description ? (

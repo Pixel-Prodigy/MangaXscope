@@ -329,9 +329,12 @@ export default function Home() {
     return () => observer.disconnect();
   }, [metadata, searchParams.page, handlePrefetchPage]);
 
-  // Scroll to top when page changes
+  // Scroll to top when page changes (only for pagination, not initial load)
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    const timer = setTimeout(() => {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }, 100);
+    return () => clearTimeout(timer);
   }, [searchParams.page]);
 
   return (
