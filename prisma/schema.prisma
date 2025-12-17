@@ -27,6 +27,7 @@ model Manga {
   coverArtId             String?
   followedCount          Int           @default(0)
   rating                 Float?
+  externalSource         Json?         // External source data for alternative chapter sources (e.g., Batoto)
   createdAt              DateTime      @default(now())
   updatedAt              DateTime      @updatedAt
   mangaDexUpdatedAt      DateTime      // Track MangaDex updates
