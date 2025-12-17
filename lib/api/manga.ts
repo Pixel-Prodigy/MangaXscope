@@ -42,8 +42,8 @@ async function fetchMangaStatistics(
   if (mangaIds.length === 0) return {};
 
   try {
-    const idsParam = mangaIds.join("&ids[]=");
-    const response = await fetch(`/api/statistics/manga?ids[]=${idsParam}`, {
+    const idsParam = mangaIds.map(id => `manga[]=${id}`).join("&");
+    const response = await fetch(`/api/statistics/manga?${idsParam}`, {
       method: "GET",
       headers: { "Content-Type": "application/json" },
       cache: "no-store",
