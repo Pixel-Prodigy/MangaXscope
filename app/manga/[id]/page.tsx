@@ -15,11 +15,11 @@ import {
   User,
   Calendar,
   ArrowLeft,
-  Play,
   CheckCircle2,
 } from "lucide-react";
 import { Navbar } from "@/components/navbar";
 import { OpenInAniyomiButton } from "@/components/manga/open-in-aniyomi-button";
+import { ChapterList } from "@/components/manga/chapter-list";
 
 const PLACEHOLDER_IMAGE =
   "https://placeholder.pics/svg/300x400/CCCCCC/FFFFFF/No%20Cover";
@@ -230,22 +230,6 @@ export default function MangaDetailPage() {
               </div>
             )}
 
-            {manga.lastChapter && (
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                <Button
-                  size="lg"
-                  className="w-full sm:w-auto min-h-[44px] shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all rounded-xl"
-                  disabled
-                >
-                  <Play className="mr-2 h-4 w-4" />
-                  Read Manga
-                </Button>
-                <p className="text-xs text-muted-foreground text-center sm:text-left sm:self-center">
-                  Chapter support coming soon
-                </p>
-              </div>
-            )}
-
             <OpenInAniyomiButton
               mangaId={manga.id}
               className="w-full sm:w-auto min-h-[44px] shadow-md hover:shadow-lg transition-all rounded-xl"
@@ -253,12 +237,22 @@ export default function MangaDetailPage() {
           </div>
         </motion.div>
 
+        {/* Chapter List */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3, delay: 0.1 }}
+          className="mt-8"
+        >
+          <ChapterList mangaId={manga.id} />
+        </motion.div>
+
         {manga.tags.length > 0 && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ duration: 0.3, delay: 0.1 }}
-            className="mt-8"
+            transition={{ duration: 0.3, delay: 0.15 }}
+            className="mt-6"
           >
             <Card className="rounded-2xl border-border/60 shadow-sm">
               <CardHeader className="pb-4">

@@ -3,6 +3,41 @@ import { NextRequest, NextResponse } from "next/server";
 const MANGA_DEX_API = "https://api.mangadex.org";
 const MANGA_DEX_COVERS_BASE = "https://uploads.mangadex.org/covers";
 
+/**
+ * Fetch with retry logic to handle transient socket errors
+ */
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit = {},
+  maxRetries = 3
+): Promise<Response> {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const response = await fetch(url, options);
+      return response;
+    } catch (error) {
+      lastError = error as Error;
+      // Only retry on socket/network errors
+      const errorMessage = (error as Error).message || "";
+      const isRetryable = 
+        errorMessage.includes("fetch failed") ||
+        errorMessage.includes("socket") ||
+        errorMessage.includes("ECONNRESET") ||
+        errorMessage.includes("UND_ERR");
+      
+      if (!isRetryable || attempt === maxRetries - 1) {
+        throw error;
+      }
+      // Wait before retrying (exponential backoff)
+      await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 100));
+    }
+  }
+  
+  throw lastError;
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ mangaId: string; coverId: string }> }
@@ -11,7 +46,7 @@ export async function GET(
     const { mangaId, coverId } = await params;
 
     // First, get the cover metadata to get the filename
-    const coverResponse = await fetch(`${MANGA_DEX_API}/cover/${coverId}`, {
+    const coverResponse = await fetchWithRetry(`${MANGA_DEX_API}/cover/${coverId}`, {
       method: "GET",
       headers: { "Content-Type": "application/json" },
       cache: "force-cache",
@@ -37,8 +72,8 @@ export async function GET(
     // Construct the image URL
     const imageUrl = `${MANGA_DEX_COVERS_BASE}/${mangaId}/${fileName}.512.jpg`;
 
-    // Fetch the actual image from MangaDex
-    const imageResponse = await fetch(imageUrl, {
+    // Fetch the actual image from MangaDex with retry
+    const imageResponse = await fetchWithRetry(imageUrl, {
       cache: "force-cache",
     });
 

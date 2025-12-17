@@ -1,0 +1,113 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider        = "prisma-client-js"
+  engineType      = "library"
+  previewFeatures = ["fullTextSearchPostgres"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Manga {
+  id                     String        @id // MangaDex UUID
+  title                  String
+  altTitles              String[]      // For search expansion
+  description            String?       @db.Text
+  status                 Status        @default(UNKNOWN)
+  year                   Int?
+  contentRating          ContentRating @default(SAFE)
+  publicationDemographic Demographic?
+  originalLanguage       String        // ja, ko, zh, en
+  lastChapter            String?
+  lastVolume             String?
+  totalChapters          Int?
+  coverArtId             String?
+  followedCount          Int           @default(0)
+  rating                 Float?
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @updatedAt
+  mangaDexUpdatedAt      DateTime      // Track MangaDex updates
+
+  // Relations
+  tags MangaTag[]
+
+  // Full-text search index
+  @@index([title])
+  @@index([status])
+  @@index([originalLanguage])
+  @@index([year])
+  @@index([totalChapters])
+  @@index([followedCount])
+  @@index([mangaDexUpdatedAt])
+  @@index([contentRating])
+}
+
+model Tag {
+  id    String   @id // MangaDex tag UUID
+  name  String
+  group TagGroup
+
+  mangas MangaTag[]
+
+  @@index([group])
+  @@index([name])
+}
+
+model MangaTag {
+  mangaId String
+  tagId   String
+
+  manga Manga @relation(fields: [mangaId], references: [id], onDelete: Cascade)
+  tag   Tag   @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([mangaId, tagId])
+  @@index([tagId])
+}
+
+model SyncMetadata {
+  id                  String     @id @default("singleton")
+  lastFullSync        DateTime?
+  lastIncrementalSync DateTime?
+  totalMangaCount     Int        @default(0)
+  syncStatus          SyncStatus @default(IDLE)
+  lastError           String?
+  updatedAt           DateTime   @updatedAt
+}
+
+enum Status {
+  ONGOING
+  COMPLETED
+  HIATUS
+  CANCELLED
+  UNKNOWN
+}
+
+enum ContentRating {
+  SAFE
+  SUGGESTIVE
+  EROTICA
+  PORNOGRAPHIC
+}
+
+enum Demographic {
+  SHOUNEN
+  SHOUJO
+  SEINEN
+  JOSEI
+}
+
+enum TagGroup {
+  GENRE
+  THEME
+  FORMAT
+  CONTENT
+}
+
+enum SyncStatus {
+  IDLE
+  SYNCING
+  ERROR
+}

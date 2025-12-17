@@ -11,12 +11,35 @@ import type {
   MangaDexAltTitle,
   MangaListItem,
 } from "./types";
+import { searchMangaDb, isDbSearchAvailable } from "./db-search";
 
 const PLACEHOLDER_IMAGE =
   "https://placeholder.pics/svg/300x400/CCCCCC/FFFFFF/No%20Cover";
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 100;
 const DEFAULT_CONTENT_RATINGS = ["safe", "suggestive"];
+
+// Cache the DB availability check
+let dbAvailable: boolean | null = null;
+let dbCheckTime = 0;
+const DB_CHECK_CACHE_MS = 60000; // Check every minute
+
+async function checkDbAvailable(): Promise<boolean> {
+  const now = Date.now();
+  if (dbAvailable !== null && now - dbCheckTime < DB_CHECK_CACHE_MS) {
+    return dbAvailable;
+  }
+
+  try {
+    dbAvailable = await isDbSearchAvailable();
+    dbCheckTime = now;
+    return dbAvailable;
+  } catch {
+    dbAvailable = false;
+    dbCheckTime = now;
+    return false;
+  }
+}
 
 function getPreferredText(
   obj: Record<string, string | undefined>,
@@ -42,7 +65,7 @@ async function fetchMangaStatistics(
   if (mangaIds.length === 0) return {};
 
   try {
-    const idsParam = mangaIds.map(id => `manga[]=${id}`).join("&");
+    const idsParam = mangaIds.map((id) => `manga[]=${id}`).join("&");
     const response = await fetch(`/api/statistics/manga?${idsParam}`, {
       method: "GET",
       headers: { "Content-Type": "application/json" },
@@ -113,7 +136,7 @@ function estimateTotalChaptersFromLastChapter(
   lastChapter: string | null
 ): number | null {
   if (!lastChapter) return null;
-  
+
   // Try to parse as a simple number (e.g., "10", "100")
   const numericValue = parseFloat(lastChapter);
   if (!isNaN(numericValue) && numericValue > 0 && numericValue % 1 === 0) {
@@ -123,7 +146,7 @@ function estimateTotalChaptersFromLastChapter(
       return Math.floor(numericValue);
     }
   }
-  
+
   return null;
 }
 
@@ -140,7 +163,7 @@ async function transformMangaDexManga(
     findRelationship(manga.relationships, "cover_art")?.id || null;
   const image = await getCoverArtUrl(manga.id, coverArtId);
   const tags = transformTags(manga.attributes.tags);
-  
+
   // Try to get total chapters from statistics first, fallback to estimating from lastChapter
   const lastChapter = normalizeChapterValue(manga.attributes.lastChapter);
   const totalChapters =
@@ -269,6 +292,48 @@ function filterByChapterCount(
 }
 
 export async function getMangaList(
+  params: MangaListParams = {}
+): Promise<MangaListResponse> {
+  const limit = Math.min(params.limit || DEFAULT_LIMIT, MAX_LIMIT);
+  const offset = params.offset || 0;
+
+  // Try database search first if available
+  const useDb = await checkDbAvailable();
+
+  if (useDb) {
+    try {
+      const sortBy = params.order?.followedCount
+        ? "popularity"
+        : params.order?.updatedAt
+        ? "latest"
+        : "latest";
+
+      return await searchMangaDb({
+        limit,
+        offset,
+        includedTags: params.includedTags,
+        excludedTags: params.excludedTags,
+        status: params.status,
+        originalLanguage: params.originalLanguage,
+        minChapters: params.minChapters,
+        maxChapters: params.maxChapters,
+        sortBy,
+        sortOrder: "desc",
+      });
+    } catch (error) {
+      console.warn("DB search failed, falling back to MangaDex:", error);
+      // Fall through to MangaDex
+    }
+  }
+
+  // Fallback to MangaDex API
+  return getMangaListFromMangaDex(params);
+}
+
+/**
+ * Original MangaDex-based manga list fetching
+ */
+async function getMangaListFromMangaDex(
   params: MangaListParams = {}
 ): Promise<MangaListResponse> {
   const limit = Math.min(params.limit || DEFAULT_LIMIT, MAX_LIMIT);
@@ -444,6 +509,37 @@ export async function getManga(id: string): Promise<Manga> {
 export async function searchManga(
   params: SearchParams
 ): Promise<MangaListResponse> {
+  const limit = Math.min(params.limit || DEFAULT_LIMIT, MAX_LIMIT);
+  const offset = params.offset || 0;
+
+  // Try database search first if available
+  const useDb = await checkDbAvailable();
+
+  if (useDb && params.query) {
+    try {
+      return await searchMangaDb({
+        query: params.query,
+        limit,
+        offset,
+        sortBy: "relevance",
+        sortOrder: "desc",
+      });
+    } catch (error) {
+      console.warn("DB search failed, falling back to MangaDex:", error);
+      // Fall through to MangaDex
+    }
+  }
+
+  // Fallback to MangaDex API
+  return searchMangaFromMangaDex(params);
+}
+
+/**
+ * Original MangaDex-based search
+ */
+async function searchMangaFromMangaDex(
+  params: SearchParams
+): Promise<MangaListResponse> {
   const searchParams = new URLSearchParams();
   const limit = Math.min(params.limit || DEFAULT_LIMIT, MAX_LIMIT);
   const offset = params.offset || 0;
@@ -483,3 +579,12 @@ export async function searchManga(
 export async function getChapter(): Promise<ChapterData> {
   throw new Error("Chapter fetching not yet implemented with MangaDex API");
 }
+
+// Re-export DB search functions for convenience
+export {
+  searchMangaDb,
+  advancedSearchMangaDb,
+  smartSearchMangaDb,
+  isDbSearchAvailable,
+  getDbSyncStatus,
+} from "./db-search";
