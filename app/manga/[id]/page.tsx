@@ -49,19 +49,24 @@ export default function MangaDetailPage() {
     queryKey: ["manga", mangaId],
     queryFn: () => getManga(mangaId),
     enabled: !!mangaId,
+    staleTime: 10 * 60 * 1000, // 10 minutes
+    gcTime: 30 * 60 * 1000,    // 30 minutes
   });
 
-  // Fetch first chapter for Read button
+  // Fetch first chapter for Read button - optimized for speed
   const { data: chapterData, isLoading: isChapterLoading } = useQuery({
     queryKey: ["first-chapter", mangaId],
     queryFn: async (): Promise<ChapterListResponse> => {
       const response = await fetch(
-        `/api/reader/${mangaId}/chapters?limit=1&offset=0`
+        `/api/reader/${mangaId}/chapters?limit=1&offset=0`,
+        { next: { revalidate: 120 } } // 2 minute cache
       );
       if (!response.ok) throw new Error("Failed to fetch chapters");
       return response.json();
     },
     enabled: !!mangaId && !!manga,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 15 * 60 * 1000,   // 15 minutes
   });
 
   const firstChapter = chapterData?.chapters?.[0];
@@ -93,19 +98,45 @@ export default function MangaDetailPage() {
   }, [mangaId]);
 
   if (isLoading) {
+    // Skeleton loading state for instant perceived performance
     return (
       <>
         <Navbar />
-        <div className="flex min-h-screen w-full items-center justify-center bg-background/80 backdrop-blur-xl">
-          <Image
-            src="/loading.gif"
-            alt="Loading"
-            width={224}
-            height={224}
-            className="w-56"
-            unoptimized
-            priority
-          />
+        <div className="container mx-auto min-h-screen px-4 py-6 sm:px-6 sm:py-8">
+          <div className="mb-6 h-10 w-32 animate-pulse rounded-lg bg-muted" />
+          <div className="mb-8 grid gap-6 sm:gap-8 md:grid-cols-[260px_1fr] lg:grid-cols-[300px_1fr]">
+            {/* Cover skeleton */}
+            <div className="flex justify-center md:justify-start">
+              <div className="aspect-[3/4] w-full max-w-[240px] sm:max-w-[260px] md:max-w-full animate-pulse rounded-2xl bg-muted" />
+            </div>
+            {/* Info skeleton */}
+            <div className="space-y-5">
+              <div className="space-y-3">
+                <div className="h-10 w-3/4 animate-pulse rounded-lg bg-muted" />
+                <div className="h-4 w-1/2 animate-pulse rounded bg-muted" />
+                <div className="flex gap-2">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="h-6 w-16 animate-pulse rounded-full bg-muted" />
+                  ))}
+                </div>
+              </div>
+              <div className="h-px bg-border" />
+              <div className="grid gap-3 sm:grid-cols-2">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="h-5 animate-pulse rounded bg-muted" />
+                ))}
+              </div>
+              <div className="h-px bg-border" />
+              <div className="space-y-2">
+                <div className="h-6 w-32 animate-pulse rounded bg-muted" />
+                <div className="space-y-1.5">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="h-4 animate-pulse rounded bg-muted" />
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </>
     );
@@ -354,3 +385,4 @@ export default function MangaDetailPage() {
     </>
   );
 }
+

@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
@@ -55,7 +55,8 @@ async function fetchChapterImages(
   dataSaver: boolean
 ): Promise<ChapterImages> {
   const response = await fetch(
-    `/api/reader/${mangaId}/${chapterId}?dataSaver=${dataSaver}`
+    `/api/reader/${mangaId}/${chapterId}?dataSaver=${dataSaver}`,
+    { next: { revalidate: 3600 } } // Cache for 1 hour - chapter images rarely change
   );
   if (!response.ok) {
     const data = await response.json();
@@ -65,7 +66,10 @@ async function fetchChapterImages(
 }
 
 async function fetchChapterList(mangaId: string): Promise<ChapterListResponse> {
-  const response = await fetch(`/api/reader/${mangaId}/chapters?limit=500`);
+  const response = await fetch(
+    `/api/reader/${mangaId}/chapters?limit=500`,
+    { next: { revalidate: 120 } } // Cache for 2 minutes
+  );
   if (!response.ok) {
     throw new Error("Failed to fetch chapter list");
   }
@@ -75,6 +79,7 @@ async function fetchChapterList(mangaId: string): Promise<ChapterListResponse> {
 export default function ReaderPage() {
   const params = useParams();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const mangaId = params.mangaId as string;
   const chapterId = params.chapterId as string;
 
@@ -83,8 +88,9 @@ export default function ReaderPage() {
   const [showSettings, setShowSettings] = useState(false);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const hasPrefetchedNextRef = useRef(false);
 
-  // Fetch chapter images
+  // Fetch chapter images with aggressive caching
   const {
     data: chapterData,
     isLoading: isLoadingImages,
@@ -93,14 +99,16 @@ export default function ReaderPage() {
     queryKey: ["chapter-images", mangaId, chapterId, dataSaver],
     queryFn: () => fetchChapterImages(mangaId, chapterId, dataSaver),
     retry: 2,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 30 * 60 * 1000, // 30 minutes - chapter images don't change
+    gcTime: 60 * 60 * 1000,    // 1 hour cache
   });
 
-  // Fetch chapter list for navigation
+  // Fetch chapter list for navigation with aggressive caching
   const { data: chapterList } = useQuery({
     queryKey: ["chapter-list", mangaId],
     queryFn: () => fetchChapterList(mangaId),
-    staleTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: 15 * 60 * 1000, // 15 minutes
+    gcTime: 60 * 60 * 1000,    // 1 hour cache
   });
 
   // Find current chapter index and neighbors
@@ -121,6 +129,25 @@ export default function ReaderPage() {
     currentChapterIndex !== undefined
       ? chapterList?.chapters[currentChapterIndex]
       : null;
+
+  // Prefetch next chapter images for instant navigation
+  useEffect(() => {
+    if (!nextChapter || hasPrefetchedNextRef.current) return;
+    
+    hasPrefetchedNextRef.current = true;
+    
+    // Prefetch next chapter data
+    queryClient.prefetchQuery({
+      queryKey: ["chapter-images", mangaId, nextChapter.id, dataSaver],
+      queryFn: () => fetchChapterImages(mangaId, nextChapter.id, dataSaver),
+      staleTime: 10 * 60 * 1000, // 10 minutes
+    });
+  }, [nextChapter, mangaId, dataSaver, queryClient]);
+
+  // Reset prefetch flag when chapter changes
+  useEffect(() => {
+    hasPrefetchedNextRef.current = false;
+  }, [chapterId]);
 
   // Auto-hide controls after delay
   const resetControlsTimeout = useCallback(() => {
@@ -192,11 +219,27 @@ export default function ReaderPage() {
   }, [router, mangaId, prevChapter, nextChapter]);
 
   if (isLoadingImages) {
+    // Skeleton loading for faster perceived performance
     return (
-      <div className="flex min-h-screen w-full items-center justify-center bg-black">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-8 w-8 animate-spin text-white" />
-          <p className="text-white/70 text-sm">Loading chapter...</p>
+      <div className="min-h-screen bg-black">
+        {/* Header skeleton */}
+        <div className="flex flex-col items-center justify-center py-12 px-4 bg-gradient-to-b from-zinc-900 to-black">
+          <div className="text-center max-w-2xl w-full">
+            <div className="h-4 w-24 mx-auto mb-2 animate-pulse rounded bg-zinc-700" />
+            <div className="h-8 w-48 mx-auto mb-2 animate-pulse rounded bg-zinc-700" />
+            <div className="h-5 w-32 mx-auto animate-pulse rounded bg-zinc-700" />
+          </div>
+        </div>
+        {/* Page skeletons */}
+        <div className="flex flex-col items-center gap-1">
+          {[1, 2, 3].map((i) => (
+            <div 
+              key={i} 
+              className="w-full max-w-4xl aspect-[3/4] animate-pulse bg-zinc-900 flex items-center justify-center"
+            >
+              <Loader2 className="h-8 w-8 animate-spin text-white/30" />
+            </div>
+          ))}
         </div>
       </div>
     );
@@ -368,6 +411,7 @@ export default function ReaderPage() {
               alt={`Page ${index + 1}`}
               index={index}
               total={chapterData.images.length}
+              allImages={chapterData.images}
             />
           ))}
         </div>
@@ -470,26 +514,62 @@ export default function ReaderPage() {
   );
 }
 
-// Separate component for lazy loading images
+// Preload the next N images for smoother scrolling
+const PRELOAD_AHEAD = 3;
+
+// Separate component for lazy loading images with preloading
 function ReaderImage({
   src,
   alt,
   index,
   total,
+  allImages,
 }: {
   src: string;
   alt: string;
   index: number;
   total: number;
+  allImages?: string[];
 }) {
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState(false);
   const imgRef = useRef<HTMLImageElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const hasPreloadedRef = useRef(false);
+
+  // Preload upcoming images when this one comes into view
+  useEffect(() => {
+    if (!containerRef.current || hasPreloadedRef.current || !allImages) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && !hasPreloadedRef.current) {
+          hasPreloadedRef.current = true;
+          
+          // Preload the next PRELOAD_AHEAD images
+          for (let i = 1; i <= PRELOAD_AHEAD; i++) {
+            const nextIndex = index + i;
+            if (nextIndex < total && allImages[nextIndex]) {
+              const link = document.createElement("link");
+              link.rel = "prefetch";
+              link.as = "image";
+              link.href = allImages[nextIndex];
+              document.head.appendChild(link);
+            }
+          }
+        }
+      },
+      { rootMargin: "200px", threshold: 0.1 }
+    );
+
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, [index, total, allImages]);
 
   return (
-    <div className="relative w-full max-w-4xl">
+    <div ref={containerRef} className="relative w-full max-w-4xl">
       {!loaded && !error && (
-        <div className="absolute inset-0 flex items-center justify-center bg-zinc-900 min-h-[300px]">
+        <div className="flex items-center justify-center bg-zinc-900 min-h-[300px]">
           <div className="flex flex-col items-center gap-2">
             <Loader2 className="h-6 w-6 animate-spin text-white/50" />
             <span className="text-white/50 text-xs">
@@ -511,11 +591,13 @@ function ReaderImage({
           ref={imgRef}
           src={src}
           alt={alt}
-          className={`w-full h-auto transition-opacity duration-300 ${
-            loaded ? "opacity-100" : "opacity-0"
+          className={`w-full h-auto transition-opacity duration-200 ${
+            loaded ? "opacity-100" : "opacity-0 absolute"
           }`}
-          loading={index < 3 ? "eager" : "lazy"}
+          // First 5 images load eagerly for instant display
+          loading={index < 5 ? "eager" : "lazy"}
           decoding="async"
+          fetchPriority={index < 3 ? "high" : "auto"}
           onLoad={() => setLoaded(true)}
           onError={() => setError(true)}
         />
@@ -523,3 +605,4 @@ function ReaderImage({
     </div>
   );
 }
+

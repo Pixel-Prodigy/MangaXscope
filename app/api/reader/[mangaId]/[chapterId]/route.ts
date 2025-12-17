@@ -1,69 +1,73 @@
+/**
+ * Chapter Pages API Route Handler.
+ * 
+ * Routes chapter page requests to the appropriate provider based on manga ID format.
+ * Returns image URLs for reading chapters.
+ * 
+ * ARCHITECTURE NOTES:
+ * - Single external API call per request
+ * - Image URLs may be proxied for CORS handling
+ * - Includes referer header if required by source
+ */
+
 import { NextRequest, NextResponse } from "next/server";
+import { parseCompositeId, getChapterPages } from "@/lib/providers";
+import type { DataSource } from "@/types";
 
-const MANGADEX_API = "https://api.mangadex.org";
+// Cache durations (in seconds)
+const CACHE_PAGES = 3600; // 1 hour for chapter pages (rarely change)
+const CACHE_SWR = 86400;  // 24 hours stale-while-revalidate
 
-interface AtHomeResponse {
-  result: string;
-  baseUrl: string;
-  chapter: {
-    hash: string;
-    data: string[];
-    dataSaver: string[];
+/**
+ * Create response with optimal caching headers.
+ * Chapter pages rarely change so we can cache aggressively.
+ */
+function createCachedResponse(data: unknown) {
+  return NextResponse.json(data, {
+    headers: {
+      "Cache-Control": `public, s-maxage=${CACHE_PAGES}, stale-while-revalidate=${CACHE_SWR}`,
+      "Vary": "Accept-Encoding",
+    },
+  });
+}
+
+// =============================================================================
+// TYPES
+// =============================================================================
+
+interface ChapterImagesResponse {
+  baseUrl?: string;
+  hash?: string;
+  images: string[];
+  dataSaverImages?: string[];
+  chapterId: string;
+  mangaId: string;
+  source: DataSource;
+  referer?: string;
+  metadata: {
+    chapter: string | null;
+    volume: string | null;
+    title: string | null;
+    translatedLanguage: string;
+    pages: number;
   };
 }
 
-interface ChapterMetadata {
-  chapter: string | null;
-  volume: string | null;
-  title: string | null;
-  translatedLanguage: string;
-  pages: number;
-}
-
-interface ChapterImagesResponse {
-  baseUrl: string;
-  hash: string;
-  images: string[];
-  dataSaverImages: string[];
-  chapterId: string;
-  mangaId: string;
-  metadata: ChapterMetadata;
-}
+// =============================================================================
+// ROUTE HANDLER
+// =============================================================================
 
 /**
- * Fetch chapter metadata from MangaDex
- */
-async function fetchChapterMetadata(chapterId: string): Promise<ChapterMetadata | null> {
-  try {
-    const response = await fetch(`${MANGADEX_API}/chapter/${chapterId}`, {
-      headers: {
-        "Content-Type": "application/json",
-        "User-Agent": "MangaHook/1.0",
-      },
-    });
-
-    if (!response.ok) return null;
-
-    const data = await response.json();
-    const attrs = data.data?.attributes;
-    
-    if (!attrs) return null;
-
-    return {
-      chapter: attrs.chapter,
-      volume: attrs.volume,
-      title: attrs.title,
-      translatedLanguage: attrs.translatedLanguage,
-      pages: attrs.pages,
-    };
-  } catch {
-    return null;
-  }
-}
-
-/**
- * GET /api/reader/[mangaId]/[chapterId]
- * Fetches chapter image URLs from MangaDex at-home servers
+ * GET /api/reader/[mangaId]/[chapterId] - Get chapter page images.
+ * 
+ * ID Formats:
+ * - UUID: Treated as MangaDex ID
+ * - Composite: source:id format
+ * - Other: Treated as Consumet ID
+ * 
+ * Query Parameters:
+ * - dataSaver: Use data-saver images (default: true)
+ * - source: Explicit source override (mangadex|consumet)
  */
 export async function GET(
   request: NextRequest,
@@ -72,74 +76,72 @@ export async function GET(
   try {
     const { mangaId, chapterId } = await params;
     const searchParams = request.nextUrl.searchParams;
-    const dataSaver = searchParams.get("dataSaver") === "true";
+    
+    const dataSaver = searchParams.get("dataSaver") !== "false";
+    const explicitSource = searchParams.get("source") as DataSource | null;
 
-    // Fetch at-home server URL and chapter metadata in parallel
-    const [atHomeResponse, metadata] = await Promise.all([
-      fetch(`${MANGADEX_API}/at-home/server/${chapterId}`, {
-        headers: {
-          "Content-Type": "application/json",
-          "User-Agent": "MangaHook/1.0",
-        },
-      }),
-      fetchChapterMetadata(chapterId),
-    ]);
+    // Determine source from manga ID
+    let source: DataSource;
+    let actualMangaId: string;
 
-    if (!atHomeResponse.ok) {
-      const errorText = await atHomeResponse.text();
-      console.error("MangaDex at-home API error:", atHomeResponse.status, errorText);
-      
-      // If chapter not found or unavailable, return a helpful message
-      if (atHomeResponse.status === 404) {
-        return NextResponse.json(
-          { 
-            error: "Chapter not found or unavailable",
-            fallbackUrl: `https://mangadex.org/chapter/${chapterId}`,
-          },
-          { status: 404 }
-        );
-      }
-      
-      return NextResponse.json(
-        { error: "Failed to fetch chapter images" },
-        { status: atHomeResponse.status }
-      );
+    if (explicitSource) {
+      source = explicitSource;
+      actualMangaId = mangaId;
+    } else {
+      const parsed = parseCompositeId(mangaId);
+      source = parsed.source;
+      actualMangaId = parsed.id;
     }
 
-    const atHomeData: AtHomeResponse = await atHomeResponse.json();
+    // Fetch chapter pages from provider
+    const result = await getChapterPages(actualMangaId, chapterId, source);
 
-    // Build proxied image URLs (through our API to avoid CORS issues on deployment)
-    const imageList = dataSaver ? atHomeData.chapter.dataSaver : atHomeData.chapter.data;
-    const dataSaverParam = dataSaver ? "?dataSaver=true" : "";
+    // Build response with proxied URLs for MangaDex (to handle CORS)
+    const images = source === "mangadex"
+      ? result.pages.map(
+          (_, index) => `/api/reader/${mangaId}/${chapterId}/page/${index}${dataSaver ? "?dataSaver=true" : ""}`
+        )
+      : result.pages.map((page) => page.imageUrl);
 
     const response: ChapterImagesResponse = {
-      baseUrl: atHomeData.baseUrl,
-      hash: atHomeData.chapter.hash,
-      // Use proxied URLs through our API
-      images: imageList.map(
-        (_, index) => `/api/reader/${mangaId}/${chapterId}/page/${index}${dataSaverParam}`
-      ),
-      dataSaverImages: atHomeData.chapter.dataSaver.map(
-        (_, index) => `/api/reader/${mangaId}/${chapterId}/page/${index}?dataSaver=true`
-      ),
+      images,
+      dataSaverImages: source === "mangadex"
+        ? result.pages.map(
+            (_, index) => `/api/reader/${mangaId}/${chapterId}/page/${index}?dataSaver=true`
+          )
+        : undefined,
       chapterId,
-      mangaId,
-      metadata: metadata || {
-        chapter: null,
-        volume: null,
-        title: null,
-        translatedLanguage: "en",
-        pages: imageList.length,
+      mangaId: actualMangaId,
+      source,
+      referer: result.referer,
+      metadata: {
+        chapter: result.metadata.chapter,
+        volume: result.metadata.volume,
+        title: result.metadata.title,
+        translatedLanguage: result.metadata.language,
+        pages: result.metadata.totalPages,
       },
     };
 
-    return NextResponse.json(response);
+    return createCachedResponse(response);
   } catch (error) {
-    console.error("Error fetching chapter images:", error);
+    console.error("[Chapter Pages API] Error:", error);
+
+    const message = error instanceof Error ? error.message : "Unknown error";
+
+    if (message.includes("404") || message.includes("not found")) {
+      return NextResponse.json(
+        { 
+          error: "Chapter not found or unavailable",
+          fallbackUrl: null,
+        },
+        { status: 404 }
+      );
+    }
+
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Failed to fetch chapter pages", details: message },
       { status: 500 }
     );
   }
 }
-

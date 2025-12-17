@@ -1,27 +1,37 @@
+/**
+ * Chapter List API Route Handler.
+ * 
+ * Routes chapter list requests to the appropriate provider based on manga ID format.
+ * 
+ * ARCHITECTURE NOTES:
+ * - Single external API call per request
+ * - Results are normalized to shared chapter format
+ * - Pagination is handled by the provider
+ */
+
 import { NextRequest, NextResponse } from "next/server";
+import { parseCompositeId, getChapterList } from "@/lib/providers";
+import type { DataSource, NormalizedChapter } from "@/types";
 
-const MANGADEX_API = "https://api.mangadex.org";
+// Cache durations (in seconds)
+const CACHE_CHAPTERS = 120; // 2 minutes for chapter lists (may update more frequently)
+const CACHE_SWR = 600;      // 10 minutes stale-while-revalidate
 
-interface MangaDexChapter {
-  id: string;
-  type: string;
-  attributes: {
-    volume: string | null;
-    chapter: string | null;
-    title: string | null;
-    translatedLanguage: string;
-    externalUrl: string | null;
-    publishAt: string;
-    readableAt: string;
-    createdAt: string;
-    updatedAt: string;
-    pages: number;
-  };
-  relationships: Array<{
-    id: string;
-    type: string;
-  }>;
+/**
+ * Create response with optimal caching headers.
+ */
+function createCachedResponse(data: unknown) {
+  return NextResponse.json(data, {
+    headers: {
+      "Cache-Control": `public, s-maxage=${CACHE_CHAPTERS}, stale-while-revalidate=${CACHE_SWR}`,
+      "Vary": "Accept-Encoding",
+    },
+  });
 }
+
+// =============================================================================
+// TYPES
+// =============================================================================
 
 interface ChapterListResponse {
   chapters: Array<{
@@ -33,16 +43,38 @@ interface ChapterListResponse {
     pages: number;
     publishedAt: string;
     externalUrl: string | null;
+    scanlationGroup?: string;
   }>;
   total: number;
-  totalExternal: number; // Count of external chapters that were filtered out
+  totalExternal: number;
+  totalByLanguage: Record<string, number>;
   limit: number;
   offset: number;
+  source: DataSource;
+  debug?: {
+    requestUrl: string;
+    queryParams: Record<string, string | string[]>;
+  };
 }
 
+// =============================================================================
+// ROUTE HANDLER
+// =============================================================================
+
 /**
- * GET /api/reader/[mangaId]/chapters
- * Fetches chapter list for a manga from MangaDex
+ * GET /api/reader/[mangaId]/chapters - Get chapter list for a manga.
+ * 
+ * ID Formats:
+ * - UUID: Treated as MangaDex ID
+ * - Composite: source:id format
+ * - Other: Treated as Consumet ID
+ * 
+ * Query Parameters:
+ * - limit: Max chapters to return (default: 100)
+ * - offset: Pagination offset (default: 0)
+ * - lang: Translation language filter (default: en)
+ * - order: Chapter sort order (asc|desc, default: asc)
+ * - source: Explicit source override (mangadex|consumet)
  */
 export async function GET(
   request: NextRequest,
@@ -52,81 +84,83 @@ export async function GET(
     const { mangaId } = await params;
     const searchParams = request.nextUrl.searchParams;
 
+    // Parse parameters
     const limit = Math.min(
       parseInt(searchParams.get("limit") || "100", 10),
-      100
-    ); // MangaDex max is 100
-    const offset = parseInt(searchParams.get("offset") || "0", 10);
-    const translatedLanguage = searchParams.get("lang") || "en";
-    const order = searchParams.get("order") || "asc"; // asc = oldest first, desc = newest first
-
-    // Build MangaDex API request
-    const apiParams = new URLSearchParams();
-    apiParams.set("manga", mangaId);
-    apiParams.set("limit", limit.toString());
-    apiParams.set("offset", offset.toString());
-    apiParams.append("translatedLanguage[]", translatedLanguage);
-    apiParams.set("order[chapter]", order);
-    // Include all content ratings to ensure we get all chapters
-    // MangaDex chapters can have different content ratings than the manga itself
-    apiParams.append("contentRating[]", "safe");
-    apiParams.append("contentRating[]", "suggestive");
-    apiParams.append("contentRating[]", "erotica");
-    apiParams.append("contentRating[]", "pornographic");
-    apiParams.append("includes[]", "scanlation_group");
-
-    const response = await fetch(
-      `${MANGADEX_API}/chapter?${apiParams.toString()}`,
-      {
-        headers: {
-          "Content-Type": "application/json",
-          "User-Agent": "MangaHook/1.0",
-        },
-      }
+      500 // Safety limit
     );
+    const offset = parseInt(searchParams.get("offset") || "0", 10);
+    const language = searchParams.get("lang") || "en";
+    const explicitSource = searchParams.get("source") as DataSource | null;
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("MangaDex chapters API error:", response.status, errorText);
+    // Determine source
+    let source: DataSource;
+    let actualMangaId: string;
+
+    if (explicitSource) {
+      source = explicitSource;
+      actualMangaId = mangaId;
+    } else {
+      const parsed = parseCompositeId(mangaId);
+      source = parsed.source;
+      actualMangaId = parsed.id;
+    }
+
+    // Fetch chapters from provider
+    const result = await getChapterList(actualMangaId, source, {
+      limit,
+      offset,
+      language,
+    });
+
+    // Separate readable vs external chapters
+    const readableChapters = result.chapters.filter(
+      (ch) => !ch.externalUrl
+    );
+    const externalChaptersCount = result.chapters.length - readableChapters.length;
+
+    // Calculate language breakdown
+    const totalByLanguage: Record<string, number> = {};
+    for (const chapter of result.chapters) {
+      totalByLanguage[chapter.language] = (totalByLanguage[chapter.language] || 0) + 1;
+    }
+
+    // Transform to response format (compatible with existing frontend)
+    const response: ChapterListResponse = {
+      chapters: readableChapters.map((ch: NormalizedChapter) => ({
+        id: ch.id,
+        chapter: ch.chapter,
+        volume: ch.volume,
+        title: ch.title,
+        language: ch.language,
+        pages: ch.pages,
+        publishedAt: ch.publishedAt,
+        externalUrl: ch.externalUrl,
+        scanlationGroup: ch.scanlationGroup || undefined,
+      })),
+      total: result.total,
+      totalExternal: externalChaptersCount,
+      totalByLanguage,
+      limit,
+      offset,
+      source,
+    };
+
+    return createCachedResponse(response);
+  } catch (error) {
+    console.error("[Chapters API] Error:", error);
+
+    const message = error instanceof Error ? error.message : "Unknown error";
+
+    if (message.includes("404") || message.includes("not found")) {
       return NextResponse.json(
-        { error: "Failed to fetch chapters" },
-        { status: response.status }
+        { error: "Manga not found" },
+        { status: 404 }
       );
     }
 
-    const data = await response.json();
-    const chapters: MangaDexChapter[] = data.data;
-
-    // Separate external and readable chapters
-    const readableChapters = chapters.filter(
-      (ch) => !ch.attributes.externalUrl
-    );
-    const externalChaptersInBatch = chapters.length - readableChapters.length;
-
-    // Transform to simpler format
-    const transformedChapters: ChapterListResponse = {
-      chapters: readableChapters.map((ch) => ({
-        id: ch.id,
-        chapter: ch.attributes.chapter,
-        volume: ch.attributes.volume,
-        title: ch.attributes.title,
-        language: ch.attributes.translatedLanguage,
-        pages: ch.attributes.pages,
-        publishedAt: ch.attributes.publishAt,
-        externalUrl: ch.attributes.externalUrl,
-      })),
-      // Keep original total for pagination purposes, but track external chapters in this batch
-      total: data.total,
-      totalExternal: externalChaptersInBatch,
-      limit: data.limit,
-      offset: data.offset,
-    };
-
-    return NextResponse.json(transformedChapters);
-  } catch (error) {
-    console.error("Error fetching chapters:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Failed to fetch chapters", details: message },
       { status: 500 }
     );
   }

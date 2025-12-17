@@ -1,5 +1,12 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// Prisma Schema for MangaXScope
+// 
+// DATABASE ARCHITECTURE:
+// - Database is used as a CACHE layer, not a full mirror
+// - Stores normalized metadata from MangaDex (Japanese manga only)
+// - Source and sourceId fields enable multi-source support
+// - Short TTL for search results, longer for details
+//
+// Note: Consumet content is NOT cached in database as it's less stable
 
 generator client {
   provider        = "prisma-client-js"
@@ -11,8 +18,19 @@ datasource db {
   provider = "postgresql"
 }
 
+// =============================================================================
+// MAIN MODELS
+// =============================================================================
+
+/// Cached manga metadata from external sources
 model Manga {
-  id                     String        @id // MangaDex UUID
+  id                     String        @id // Source-specific ID (MangaDex UUID)
+  
+  // Source tracking
+  source                 DataSource    @default(MANGADEX)
+  sourceId               String?       // Original ID from source (for reference)
+  
+  // Core metadata (normalized)
   title                  String
   altTitles              String[]      // For search expansion
   description            String?       @db.Text
@@ -21,21 +39,32 @@ model Manga {
   contentRating          ContentRating @default(SAFE)
   publicationDemographic Demographic?
   originalLanguage       String        // ja, ko, zh, en
+  
+  // Chapter info
   lastChapter            String?
   lastVolume             String?
   totalChapters          Int?
+  
+  // Media
   coverArtId             String?
+  
+  // Popularity metrics
   followedCount          Int           @default(0)
   rating                 Float?
-  externalSource         Json?         // External source data for alternative chapter sources (e.g., Batoto)
+  
+  // Cache management
   createdAt              DateTime      @default(now())
   updatedAt              DateTime      @updatedAt
-  mangaDexUpdatedAt      DateTime      // Track MangaDex updates
-
+  mangaDexUpdatedAt      DateTime      // Track source updates
+  
+  // TTL for cache expiration (optional, can be handled in app logic)
+  expiresAt              DateTime?
+  
   // Relations
-  tags MangaTag[]
+  tags                   MangaTag[]
 
-  // Full-text search index
+  // Indexes for efficient queries
+  @@index([source])
   @@index([title])
   @@index([status])
   @@index([originalLanguage])
@@ -44,10 +73,12 @@ model Manga {
   @@index([followedCount])
   @@index([mangaDexUpdatedAt])
   @@index([contentRating])
+  @@index([expiresAt])
 }
 
+/// Cached tags for filtering
 model Tag {
-  id    String   @id // MangaDex tag UUID
+  id    String   @id // Source-specific ID
   name  String
   group TagGroup
 
@@ -57,6 +88,7 @@ model Tag {
   @@index([name])
 }
 
+/// Many-to-many relation between Manga and Tag
 model MangaTag {
   mangaId String
   tagId   String
@@ -68,6 +100,7 @@ model MangaTag {
   @@index([tagId])
 }
 
+/// Sync metadata for tracking database updates
 model SyncMetadata {
   id                  String     @id @default("singleton")
   lastFullSync        DateTime?
@@ -78,6 +111,17 @@ model SyncMetadata {
   updatedAt           DateTime   @updatedAt
 }
 
+// =============================================================================
+// ENUMS
+// =============================================================================
+
+/// Data source identifier
+enum DataSource {
+  MANGADEX
+  CONSUMET
+}
+
+/// Publication status
 enum Status {
   ONGOING
   COMPLETED
@@ -86,6 +130,7 @@ enum Status {
   UNKNOWN
 }
 
+/// Content rating for age appropriateness
 enum ContentRating {
   SAFE
   SUGGESTIVE
@@ -93,6 +138,7 @@ enum ContentRating {
   PORNOGRAPHIC
 }
 
+/// Target demographic
 enum Demographic {
   SHOUNEN
   SHOUJO
@@ -100,6 +146,7 @@ enum Demographic {
   JOSEI
 }
 
+/// Tag category
 enum TagGroup {
   GENRE
   THEME
@@ -107,6 +154,7 @@ enum TagGroup {
   CONTENT
 }
 
+/// Sync operation status
 enum SyncStatus {
   IDLE
   SYNCING

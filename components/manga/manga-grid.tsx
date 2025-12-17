@@ -83,25 +83,24 @@ const MangaGridComponent = function MangaGrid({
   className,
   onCardClick,
   emptyMessage = DEFAULT_EMPTY_MESSAGE,
+  skeletonCount = 18,
 }: MangaGridProps) {
   if (isLoading) {
+    // Show skeleton grid for faster perceived performance
     return (
-      <div
-        className="flex min-h-[400px] items-center justify-center"
+      <section
+        className={cn(
+          "grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7",
+          className
+        )}
         role="status"
         aria-label="Loading mangas"
         aria-live="polite"
       >
-        <Image
-          src="/loading.gif"
-          alt="Loading"
-          width={224}
-          height={224}
-          className="w-56"
-          unoptimized
-          priority
-        />
-      </div>
+        {Array.from({ length: skeletonCount }).map((_, index) => (
+          <MangaSkeleton key={index} />
+        ))}
+      </section>
     );
   }
 

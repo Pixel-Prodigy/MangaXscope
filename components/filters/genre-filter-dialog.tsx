@@ -215,24 +215,22 @@ export function GenreFilterDialog() {
     setIncludeGenres({ include: null, exclude: null });
   };
 
-  const activeCount = Array.from(localFilters.values()).filter(
-    (f) => f.mode !== null
-  ).length;
+  // Count active filters from URL params (source of truth)
+  const activeCount = (includeGenres.include?.length || 0) + (includeGenres.exclude?.length || 0);
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button variant="outline" className="relative flex-1 min-w-0 min-h-[44px] sm:min-h-[48px] rounded-xl">
-          <div className="relative mr-1.5 sm:mr-2 h-4 w-4 shrink-0 overflow-hidden rounded-full">
-            <span className="flex items-center justify-center h-full w-full">
-              <BookOpenIcon className="h-4 w-4 text-muted-foreground" />
-            </span>
-          </div>
+          <BookOpenIcon className="mr-1.5 sm:mr-2 h-4 w-4 shrink-0 text-muted-foreground" />
           <span className="truncate text-sm sm:text-base">Genres</span>
           {activeCount > 0 && (
-            <span className="ml-1.5 sm:ml-2 rounded-full bg-primary px-2 sm:px-2.5 py-0.5 text-xs font-semibold text-primary-foreground shrink-0">
+            <Badge 
+              variant="secondary" 
+              className="ml-1.5 sm:ml-2 bg-primary text-primary-foreground px-2 py-0.5 text-xs font-semibold shrink-0"
+            >
               {activeCount}
-            </span>
+            </Badge>
           )}
         </Button>
       </DialogTrigger>

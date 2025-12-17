@@ -1,34 +1,44 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Search, X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useQueryStates, parseAsString } from "nuqs";
+import type { ContentSection } from "@/types";
 
 const DEBOUNCE_DELAY = 500;
 
 export function SearchBar() {
-  const [search, setSearch] = useQueryStates(
-    { q: parseAsString.withDefault("") },
+  const [params, setParams] = useQueryStates(
+    { 
+      q: parseAsString.withDefault(""),
+      section: parseAsString.withDefault("manga"),
+    },
     { shallow: false }
   );
 
-  const [localValue, setLocalValue] = useState(() => search.q || "");
+  const currentSection = (params.section || "manga") as ContentSection;
+
+  const [localValue, setLocalValue] = useState(() => params.q || "");
   const [isDebouncing, setIsDebouncing] = useState(false);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isInternalUpdateRef = useRef(false);
 
-  // Sync from URL to local state when URL changes externally (e.g., browser navigation)
-  // Using a ref to track internal updates to avoid sync loops
-  // This is a valid pattern for syncing external state (URL params) to local state for controlled inputs
+  // Dynamic placeholder based on section
+  const placeholder = useMemo(() => {
+    return currentSection === "webcomics" 
+      ? "Search manhwa, manhua, webtoons..."
+      : "Search manga...";
+  }, [currentSection]);
+
+  // Sync from URL to local state when URL changes externally
   useEffect(() => {
     if (!isInternalUpdateRef.current) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setLocalValue(search.q || "");
+      setLocalValue(params.q || "");
     }
     isInternalUpdateRef.current = false;
-  }, [search.q]);
+  }, [params.q]);
 
   const debouncedSetSearch = useCallback(
     (value: string) => {
@@ -43,10 +53,10 @@ export function SearchBar() {
       debounceTimerRef.current = setTimeout(() => {
         setIsDebouncing(false);
         isInternalUpdateRef.current = true;
-        setSearch({ q: value.trim() || null });
+        setParams({ q: value.trim() || null });
       }, DEBOUNCE_DELAY);
     },
-    [setSearch]
+    [setParams]
   );
 
   const handleSearch = (value: string) => {
@@ -69,7 +79,7 @@ export function SearchBar() {
       clearTimeout(debounceTimerRef.current);
     }
     isInternalUpdateRef.current = true;
-    setSearch({ q: null });
+    setParams({ q: null });
   };
 
   return (
@@ -77,7 +87,7 @@ export function SearchBar() {
       <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition-colors sm:left-4" />
       <Input
         type="text"
-        placeholder="Search for manga..."
+        placeholder={placeholder}
         value={localValue}
         onChange={(e) => handleSearch(e.target.value)}
         className="w-full pl-10 pr-12 sm:pl-11 sm:pr-14 h-11 sm:h-12 text-base rounded-xl border-border/60 transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
@@ -102,4 +112,3 @@ export function SearchBar() {
     </div>
   );
 }
-

@@ -1,5 +1,11 @@
-import type { MangaListResponse, MangaListItem } from "./types";
-import { parseNaturalQuery, parsedQueryToSearchParams } from "@/lib/sync/tag-mapping";
+/**
+ * Database Search Functions.
+ * 
+ * Client-side functions for searching the database cache.
+ * These call the /api/search endpoint which routes to the DB when available.
+ */
+
+import type { MangaListResponse, MangaListItem } from "@/types";
 
 const DEFAULT_LIMIT = 20;
 
@@ -19,11 +25,9 @@ export interface DbSearchParams {
 }
 
 /**
- * Search manga using the database-backed search API
+ * Search manga using the database-backed search API.
  */
-export async function searchMangaDb(
-  params: DbSearchParams
-): Promise<MangaListResponse> {
+export async function searchMangaDb(params: DbSearchParams): Promise<MangaListResponse> {
   const searchParams = new URLSearchParams();
 
   if (params.query) {
@@ -63,28 +67,17 @@ export async function searchMangaDb(
     throw new Error(`Search API error: ${response.status} ${response.statusText}`);
   }
 
-  const data = await response.json();
-
-  // Transform to match MangaListResponse format
-  return {
-    mangaList: data.mangaList as MangaListItem[],
-    metaData: {
-      total: data.metaData.total,
-      limit: data.metaData.limit,
-      offset: data.metaData.offset,
-      totalPages: data.metaData.totalPages,
-    },
-  };
+  return response.json();
 }
 
 /**
- * Advanced search with tag-weighted scoring
+ * Advanced search with tag-weighted scoring.
  */
 export async function advancedSearchMangaDb(params: {
   query?: string;
   includedTags?: string[];
   excludedTags?: string[];
-  preferredTags?: string[]; // Tags that boost score but aren't required
+  preferredTags?: string[];
   status?: string[];
   contentRating?: string[];
   originalLanguage?: string[];
@@ -123,7 +116,7 @@ export async function advancedSearchMangaDb(params: {
 }
 
 /**
- * Get database sync status
+ * Get database sync status.
  */
 export async function getDbSyncStatus(): Promise<{
   status: "IDLE" | "SYNCING" | "ERROR";
@@ -145,7 +138,7 @@ export async function getDbSyncStatus(): Promise<{
 }
 
 /**
- * Check if database has data (for deciding whether to use DB search)
+ * Check if database has data (for deciding whether to use DB search).
  */
 export async function isDbSearchAvailable(): Promise<boolean> {
   try {
@@ -157,13 +150,10 @@ export async function isDbSearchAvailable(): Promise<boolean> {
 }
 
 /**
- * Smart search using natural language query parsing
- * Automatically extracts tags, status, language, and chapter requirements from query
+ * Smart search using natural language query.
  * 
- * Example queries:
- * - "dark revenge smart mc" -> preferredTags: [psychological, revenge]
- * - "cultivation without harem" -> preferredTags: [cultivation], excludedTags: [harem]
- * - "completed manhwa 100+ chapters" -> status: COMPLETED, language: ko, minChapters: 100
+ * @deprecated Use searchMangaDb instead. Natural language parsing
+ * has been removed in favor of explicit filters.
  */
 export async function smartSearchMangaDb(
   naturalQuery: string,
@@ -194,54 +184,27 @@ export async function smartSearchMangaDb(
     maxChapters?: number;
   };
 }> {
-  // Parse the natural language query
-  const parsed = parseNaturalQuery(naturalQuery);
-  const searchParams = parsedQueryToSearchParams(parsed);
-
-  // Merge with additional tags
-  const includedTags = [
-    ...(searchParams.includedTags || []),
-    ...(options.additionalIncludedTags || []),
-  ];
-  const excludedTags = [
-    ...(searchParams.excludedTags || []),
-    ...(options.additionalExcludedTags || []),
-  ];
-
-  // Make the search request
-  const response = await fetch("/api/search", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      query: searchParams.query,
-      includedTags: includedTags.length > 0 ? includedTags : undefined,
-      excludedTags: excludedTags.length > 0 ? excludedTags : undefined,
-      preferredTags: searchParams.preferredTags,
-      status: searchParams.status ? [searchParams.status] : undefined,
-      originalLanguage: searchParams.originalLanguage 
-        ? [searchParams.originalLanguage] 
-        : undefined,
-      minChapters: searchParams.minChapters,
-      maxChapters: searchParams.maxChapters,
-      contentRating: options.contentRating?.map((r) => r.toUpperCase()),
-      limit: options.limit || DEFAULT_LIMIT,
-      offset: options.offset || 0,
-      sortBy: "relevance",
-      sortOrder: "desc",
-    }),
+  // Simplified: just do a regular search
+  const searchResult = await advancedSearchMangaDb({
+    query: naturalQuery,
+    includedTags: options.additionalIncludedTags,
+    excludedTags: options.additionalExcludedTags,
+    contentRating: options.contentRating,
+    limit: options.limit || DEFAULT_LIMIT,
+    offset: options.offset || 0,
+    sortBy: "relevance",
+    sortOrder: "desc",
   });
 
-  if (!response.ok) {
-    throw new Error(`Search API error: ${response.status} ${response.statusText}`);
-  }
-
-  const data = await response.json();
-
   return {
-    results: data.results || [],
-    mangaList: data.mangaList || [],
-    metaData: data.metaData,
-    parsedQuery: parsed,
+    results: searchResult.results || [],
+    mangaList: searchResult.results?.map((r) => r.manga) || [],
+    metaData: searchResult.metaData,
+    parsedQuery: {
+      textQuery: naturalQuery,
+      includedTags: options.additionalIncludedTags || [],
+      excludedTags: options.additionalExcludedTags || [],
+      preferredTags: [],
+    },
   };
 }
-

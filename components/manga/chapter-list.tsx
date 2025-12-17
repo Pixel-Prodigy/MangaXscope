@@ -40,41 +40,60 @@ interface ChapterListProps {
 
 async function fetchChapters(mangaId: string): Promise<ChapterListResponse> {
   // MangaDex API max limit is 100, so we need to paginate for more chapters
-  const allChapters: Chapter[] = [];
-  let offset = 0;
   const limit = 100;
-  let total = 0;
+  const maxChapters = 500;
   let totalExternalChapters = 0;
 
-  // Fetch first batch
+  // Fetch first batch to get total count
   const firstResponse = await fetch(
-    `/api/reader/${mangaId}/chapters?limit=${limit}&offset=0`
+    `/api/reader/${mangaId}/chapters?limit=${limit}&offset=0`,
+    { next: { revalidate: 120 } } // Cache for 2 minutes
   );
   if (!firstResponse.ok) {
     throw new Error("Failed to fetch chapters");
   }
   const firstData = await firstResponse.json();
-  allChapters.push(...firstData.chapters);
-  total = firstData.total;
+  const total = Math.min(firstData.total, maxChapters);
   totalExternalChapters += firstData.totalExternal || 0;
 
-  // Fetch remaining batches if needed (up to 500 total chapters)
-  const maxChapters = 500;
-  while (allChapters.length < total && allChapters.length < maxChapters) {
-    offset += limit;
-    const response = await fetch(
-      `/api/reader/${mangaId}/chapters?limit=${limit}&offset=${offset}`
+  // If we have all chapters in the first batch, return early
+  if (firstData.chapters.length >= total) {
+    return {
+      chapters: firstData.chapters,
+      total: firstData.chapters.length,
+      totalExternal: totalExternalChapters,
+    };
+  }
+
+  // Calculate remaining batches needed and fetch them in PARALLEL
+  const remainingBatches = Math.ceil((total - limit) / limit);
+  const batchPromises: Promise<{ chapters: Chapter[]; totalExternal: number }>[] = [];
+  
+  for (let i = 1; i <= remainingBatches; i++) {
+    const offset = i * limit;
+    batchPromises.push(
+      fetch(
+        `/api/reader/${mangaId}/chapters?limit=${limit}&offset=${offset}`,
+        { next: { revalidate: 120 } }
+      )
+        .then(res => res.ok ? res.json() : { chapters: [], totalExternal: 0 })
+        .catch(() => ({ chapters: [], totalExternal: 0 }))
     );
-    if (!response.ok) break;
-    const data = await response.json();
-    if (data.chapters.length === 0) break;
-    allChapters.push(...data.chapters);
-    totalExternalChapters += data.totalExternal || 0;
+  }
+
+  // Wait for all batches in parallel
+  const batchResults = await Promise.all(batchPromises);
+  
+  // Combine all chapters
+  const allChapters = [...firstData.chapters];
+  for (const batch of batchResults) {
+    allChapters.push(...batch.chapters);
+    totalExternalChapters += batch.totalExternal || 0;
   }
 
   return {
     chapters: allChapters,
-    total: allChapters.length, // Return actual readable count
+    total: allChapters.length,
     totalExternal: totalExternalChapters,
   };
 }
@@ -85,7 +104,8 @@ export function ChapterList({ mangaId, className }: ChapterListProps) {
   const { data, isLoading, error } = useQuery({
     queryKey: ["chapters", mangaId],
     queryFn: () => fetchChapters(mangaId),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 10 * 60 * 1000, // 10 minutes
+    gcTime: 30 * 60 * 1000,    // 30 minutes
   });
 
   if (isLoading) {

@@ -1,11 +1,16 @@
 /**
- * Source abstraction layer for manga chapter providers.
+ * Source abstraction layer.
  * 
- * This module provides a unified interface for fetching chapters from
- * multiple sources (MangaDex as primary, Batoto as fallback).
+ * @deprecated This module is deprecated in favor of /lib/providers.
+ * Use the provider abstraction for new code.
+ * 
+ * This file is kept for backward compatibility with existing code
+ * during the migration period.
  */
 
 export * from "./types";
 export * from "./mangadex";
-export * from "./batoto";
 
+// Re-export providers for gradual migration
+export { mangadexProvider } from "@/lib/providers/mangadex";
+export { consumetProvider } from "@/lib/providers/consumet";

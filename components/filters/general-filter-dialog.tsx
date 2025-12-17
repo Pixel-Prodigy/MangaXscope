@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -10,45 +10,62 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Filter } from "lucide-react";
-import { CategorySelect } from "./category-select";
 import { ChapterFilter } from "./chapter-filter";
 import { StatusFilter } from "./status-filter";
+import { useQueryStates, parseAsString, parseAsArrayOf } from "nuqs";
 
 export function GeneralFilterDialog() {
   const [open, setOpen] = useState(false);
+  
+  // Get current filter values to show badge count
+  const [filterParams] = useQueryStates(
+    {
+      minChapters: parseAsString,
+      maxChapters: parseAsString,
+      status: parseAsArrayOf(parseAsString),
+    },
+    { shallow: false }
+  );
+
+  // Calculate active filter count
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (filterParams.minChapters) count++;
+    if (filterParams.maxChapters) count++;
+    if (filterParams.status?.length) count += filterParams.status.length;
+    return count;
+  }, [filterParams]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant="outline" className="relative flex-1 min-w-0 min-h-[44px] sm:min-h-[48px] rounded-xl">
           <Filter className="mr-1.5 sm:mr-2 h-4 w-4 shrink-0" />
-          <span className="truncate text-sm sm:text-base">General Filter</span>
+          <span className="truncate text-sm sm:text-base">Filters</span>
+          {activeFilterCount > 0 && (
+            <Badge 
+              variant="secondary" 
+              className="ml-1.5 sm:ml-2 bg-primary text-primary-foreground px-2 py-0.5 text-xs font-semibold shrink-0"
+            >
+              {activeFilterCount}
+            </Badge>
+          )}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-h-[95vh] sm:max-h-[90vh] max-w-2xl w-[95vw] sm:w-full flex flex-col p-0 gap-0">
         <DialogHeader className="px-4 sm:px-6 pt-4 sm:pt-6 pb-3 sm:pb-4 border-b shrink-0">
           <DialogTitle className="text-xl sm:text-2xl">
-            General Filter
+            Filters
           </DialogTitle>
           <DialogDescription className="text-xs sm:text-sm">
-            Filter by category, chapter range, and status
+            Filter by chapter range and publication status
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 sm:py-6 space-y-3 sm:space-y-4">
-          <Card className="border-2 shadow-sm active:shadow-md sm:hover:shadow-md transition-shadow">
-            <CardHeader className="pb-2 sm:pb-3 px-4 sm:px-6 pt-4 sm:pt-6">
-              <CardTitle className="text-sm sm:text-base font-semibold">
-                Category
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="px-4 sm:px-6 pb-4 sm:pb-6">
-              <CategorySelect />
-            </CardContent>
-          </Card>
-
           <Card className="border-2 shadow-sm active:shadow-md sm:hover:shadow-md transition-shadow">
             <CardHeader className="pb-2 sm:pb-3 px-4 sm:px-6 pt-4 sm:pt-6">
               <CardTitle className="text-sm sm:text-base font-semibold">
@@ -63,7 +80,7 @@ export function GeneralFilterDialog() {
           <Card className="border-2 shadow-sm active:shadow-md sm:hover:shadow-md transition-shadow">
             <CardHeader className="pb-2 sm:pb-3 px-4 sm:px-6 pt-4 sm:pt-6">
               <CardTitle className="text-sm sm:text-base font-semibold">
-                Status
+                Publication Status
               </CardTitle>
             </CardHeader>
             <CardContent className="px-4 sm:px-6 pb-4 sm:pb-6">

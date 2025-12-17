@@ -13,25 +13,25 @@ import { SearchBar } from "@/components/filters/search-bar";
 import { SortSelect } from "@/components/filters/sort-select";
 import { GenreFilterDialog } from "@/components/filters/genre-filter-dialog";
 import { GeneralFilterDialog } from "@/components/filters/general-filter-dialog";
-import { getMangaList, searchManga } from "@/lib/api/manga";
+import { WebcomicsFilterDialog } from "@/components/filters/webcomics-filter-dialog";
+import { SectionSelector } from "@/components/filters/section-selector";
+import { getMangaList, getWebcomicsList, searchManga, searchWebcomics } from "@/lib/api/manga";
 import { Button } from "@/components/ui/button";
 import { Navbar } from "@/components/navbar";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import type { ContentSection, WebcomicType, MangaListResponse } from "@/types";
 
 const LIMIT = 20;
 const PREFETCH_RANGE = 3;
 const PREFETCH_STALE_TIME = 5 * 60 * 1000;
-const CATEGORY_MAP: Record<string, string> = {
-  manga: "ja",
-  manhua: "zh",
-  manhwa: "ko",
-};
 
 export default function Home() {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useQueryStates(
     {
       q: parseAsString,
+      section: parseAsString.withDefault("manga"),
+      webcomicType: parseAsString,
       type: parseAsString.withDefault("latest"),
       includeCategories: parseAsArrayOf(parseAsString),
       excludeCategories: parseAsArrayOf(parseAsString),
@@ -47,12 +47,16 @@ export default function Home() {
     }
   );
 
+  const currentSection = (searchParams.section || "manga") as ContentSection;
+  const currentWebcomicType = searchParams.webcomicType as WebcomicType | null;
   const isSearch = !!searchParams.q;
   const prevFiltersRef = useRef<string>("");
 
   // Reset page to 1 only when filters change (not when page itself changes)
   useEffect(() => {
     const currentFilters = JSON.stringify({
+      section: searchParams.section,
+      webcomicType: searchParams.webcomicType,
       type: searchParams.type,
       includeCategories: searchParams.includeCategories,
       excludeCategories: searchParams.excludeCategories,
@@ -72,6 +76,8 @@ export default function Home() {
 
     prevFiltersRef.current = currentFilters;
   }, [
+    searchParams.section,
+    searchParams.webcomicType,
     searchParams.type,
     searchParams.includeCategories,
     searchParams.excludeCategories,
@@ -85,36 +91,40 @@ export default function Home() {
     setSearchParams,
   ]);
 
-  const getOriginalLanguage = useCallback(() => {
-    const includedCategories = searchParams.includeCategories || [];
-    const excludedCategories = searchParams.excludeCategories || [];
-
-    if (includedCategories.length > 0) {
-      return includedCategories
-        .map((cat) => CATEGORY_MAP[cat])
-        .filter((lang): lang is string => !!lang);
-    }
-
-    if (excludedCategories.length > 0) {
-      const allCategories = Object.keys(CATEGORY_MAP);
-      const allowedCategories = allCategories.filter(
-        (cat) => !excludedCategories.includes(cat)
-      );
-      return allowedCategories
-        .map((cat) => CATEGORY_MAP[cat])
-        .filter((lang): lang is string => !!lang);
-    }
-
-    return undefined;
-  }, [searchParams.includeCategories, searchParams.excludeCategories]);
-
-  const fetchMangaData = useCallback(
-    async (page: number) => {
+  // Fetch function based on section
+  const fetchData = useCallback(
+    async (page: number): Promise<MangaListResponse> => {
       const offset = (page - 1) * LIMIT;
+      const status = searchParams.status?.length ? searchParams.status : undefined;
 
-      if (isSearch) {
+      // WEBCOMICS SECTION
+      if (currentSection === "webcomics") {
+        if (isSearch && searchParams.q) {
+          return searchWebcomics(searchParams.q, {
+            limit: LIMIT,
+            offset,
+            webcomicType: currentWebcomicType || undefined,
+            status, // Pass status filter to search
+          });
+        }
+
+        return getWebcomicsList({
+          limit: LIMIT,
+          offset,
+          webcomicType: currentWebcomicType || undefined,
+          status,
+          order:
+            searchParams.type === "popular"
+              ? { followedCount: "desc" }
+              : { updatedAt: "desc" },
+        });
+      }
+
+      // MANGA SECTION
+      if (isSearch && searchParams.q) {
         return searchManga({
-          query: searchParams.q!,
+          query: searchParams.q,
+          section: "manga",
           limit: LIMIT,
           offset,
         });
@@ -127,22 +137,23 @@ export default function Home() {
 
       const includedTags = searchParams.include || [];
       const excludedTags = searchParams.exclude || [];
-      const originalLanguage = getOriginalLanguage();
-      const status = searchParams.status || [];
 
       return getMangaList({
+        section: "manga",
         limit: LIMIT,
         offset,
         order,
         includedTags: includedTags.length > 0 ? includedTags : undefined,
         excludedTags: excludedTags.length > 0 ? excludedTags : undefined,
-        originalLanguage,
+        originalLanguage: ["ja"], // Manga section = Japanese only
         minChapters: searchParams.minChapters || undefined,
         maxChapters: searchParams.maxChapters || undefined,
-        status: status.length > 0 ? status : undefined,
+        status,
       });
     },
     [
+      currentSection,
+      currentWebcomicType,
       isSearch,
       searchParams.q,
       searchParams.type,
@@ -151,32 +162,30 @@ export default function Home() {
       searchParams.minChapters,
       searchParams.maxChapters,
       searchParams.status,
-      getOriginalLanguage,
     ]
   );
 
   const queryKey = useMemo(
-    () =>
-      isSearch
-        ? ["search", searchParams.q, searchParams.page]
-        : [
-            "mangaList",
-            searchParams.type,
-            searchParams.includeCategories,
-            searchParams.excludeCategories,
-            searchParams.include,
-            searchParams.exclude,
-            searchParams.minChapters,
-            searchParams.maxChapters,
-            searchParams.status,
-            searchParams.page,
-          ],
+    () => [
+      "content",
+      currentSection,
+      currentWebcomicType,
+      isSearch ? "search" : "browse",
+      searchParams.q,
+      searchParams.type,
+      searchParams.include,
+      searchParams.exclude,
+      searchParams.minChapters,
+      searchParams.maxChapters,
+      searchParams.status,
+      searchParams.page,
+    ],
     [
+      currentSection,
+      currentWebcomicType,
       isSearch,
       searchParams.q,
       searchParams.type,
-      searchParams.includeCategories,
-      searchParams.excludeCategories,
       searchParams.include,
       searchParams.exclude,
       searchParams.minChapters,
@@ -186,41 +195,40 @@ export default function Home() {
     ]
   );
 
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, isFetching } = useQuery({
     queryKey,
-    queryFn: () => fetchMangaData(searchParams.page),
+    queryFn: () => fetchData(searchParams.page),
     enabled: !isSearch || !!searchParams.q,
-    staleTime: 2 * 60 * 1000, // 2 minutes - data stays fresh
-    gcTime: 10 * 60 * 1000, // 10 minutes - keep in cache longer
-    refetchOnWindowFocus: false, // Don't refetch on window focus for better performance
+    staleTime: 10 * 60 * 1000, // 10 minutes - data stays fresh
+    gcTime: 30 * 60 * 1000,    // 30 minutes - keep in cache
+    refetchOnWindowFocus: false,
+    // Show stale data instantly while fetching new data in background
+    placeholderData: (previousData) => previousData,
   });
 
   const metadata = data?.metaData;
 
   const buildQueryKeyForPage = useCallback(
-    (page: number) => {
-      if (isSearch) {
-        return ["search", searchParams.q, page];
-      }
-      return [
-        "mangaList",
-        searchParams.type,
-        searchParams.includeCategories,
-        searchParams.excludeCategories,
-        searchParams.include,
-        searchParams.exclude,
-        searchParams.minChapters,
-        searchParams.maxChapters,
-        searchParams.status,
-        page,
-      ];
-    },
+    (page: number) => [
+      "content",
+      currentSection,
+      currentWebcomicType,
+      isSearch ? "search" : "browse",
+      searchParams.q,
+      searchParams.type,
+      searchParams.include,
+      searchParams.exclude,
+      searchParams.minChapters,
+      searchParams.maxChapters,
+      searchParams.status,
+      page,
+    ],
     [
+      currentSection,
+      currentWebcomicType,
       isSearch,
       searchParams.q,
       searchParams.type,
-      searchParams.includeCategories,
-      searchParams.excludeCategories,
       searchParams.include,
       searchParams.exclude,
       searchParams.minChapters,
@@ -237,18 +245,16 @@ export default function Home() {
       const pageQueryKey = buildQueryKeyForPage(page);
       const existingData = queryClient.getQueryData(pageQueryKey);
 
-      // Skip if already cached and fresh
       if (existingData) return;
 
-      // Prefetch the page data
       queryClient.prefetchQuery({
         queryKey: pageQueryKey,
-        queryFn: () => fetchMangaData(page),
+        queryFn: () => fetchData(page),
         staleTime: PREFETCH_STALE_TIME,
-        gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
+        gcTime: 10 * 60 * 1000,
       });
     },
-    [metadata, buildQueryKeyForPage, queryClient, fetchMangaData]
+    [metadata, buildQueryKeyForPage, queryClient, fetchData]
   );
 
   // Smart prefetch: prioritize adjacent pages, then expand
@@ -259,7 +265,6 @@ export default function Home() {
     const totalPages = metadata.totalPages;
     const prefetchQueue: Array<{ page: number; priority: "high" | "low" }> = [];
 
-    // High priority: immediate next/prev pages
     if (currentPage + 1 <= totalPages) {
       prefetchQueue.push({ page: currentPage + 1, priority: "high" });
     }
@@ -267,7 +272,6 @@ export default function Home() {
       prefetchQueue.push({ page: currentPage - 1, priority: "high" });
     }
 
-    // Low priority: pages within range
     for (let i = 2; i <= PREFETCH_RANGE; i++) {
       const nextPage = currentPage + i;
       const prevPage = currentPage - i;
@@ -279,16 +283,13 @@ export default function Home() {
       }
     }
 
-    // Execute high priority first, then low priority
     const highPriority = prefetchQueue.filter((p) => p.priority === "high");
     const lowPriority = prefetchQueue.filter((p) => p.priority === "low");
 
-    // Immediate prefetch for high priority
     highPriority.forEach(({ page }) => {
       handlePrefetchPage(page);
     });
 
-    // Deferred prefetch for low priority (non-blocking)
     if (lowPriority.length > 0) {
       const timeoutId = setTimeout(() => {
         lowPriority.forEach(({ page }) => {
@@ -312,7 +313,6 @@ export default function Home() {
           const currentPage = searchParams.page;
           const totalPages = metadata.totalPages;
 
-          // Prefetch next 2 pages when pagination is visible
           for (let i = 1; i <= 2; i++) {
             const nextPage = currentPage + i;
             if (nextPage <= totalPages) {
@@ -328,44 +328,75 @@ export default function Home() {
     return () => observer.disconnect();
   }, [metadata, searchParams.page, handlePrefetchPage]);
 
-  // Scroll to top when page changes (only for pagination, not initial load)
+  // Scroll to top when page changes
   useEffect(() => {
-    // Only scroll if page actually changed (not on initial mount)
     const hasPageChanged = searchParams.page !== 1;
-    
+
     if (hasPageChanged) {
-      // Use instant scroll for better performance and to avoid glitches
       window.scrollTo(0, 0);
       document.documentElement.scrollTop = 0;
       document.body.scrollTop = 0;
     }
   }, [searchParams.page]);
 
+  // Section title
+  const sectionTitle = currentSection === "webcomics" 
+    ? currentWebcomicType 
+      ? `${currentWebcomicType.charAt(0).toUpperCase() + currentWebcomicType.slice(1)}` 
+      : "Webcomics"
+    : "Manga";
+
   return (
     <>
       <Navbar />
       <div className="container mx-auto min-h-screen px-4 py-6 sm:px-6 sm:py-8">
+        {/* Section Selector */}
+        <div className="mb-6">
+          <SectionSelector />
+        </div>
+
+        {/* Search and Filters */}
         <div className="mb-6 sm:mb-8 flex flex-col gap-4 sm:flex-row sm:items-center">
           <div className="flex-1 min-w-0">
             <SearchBar />
           </div>
           <div className="flex gap-2 sm:gap-3 min-w-0">
             <SortSelect />
-            <GeneralFilterDialog />
-            <GenreFilterDialog />
+            {/* Section-specific filters */}
+            {currentSection === "manga" ? (
+              <>
+                <GeneralFilterDialog />
+                <GenreFilterDialog />
+              </>
+            ) : (
+              <WebcomicsFilterDialog />
+            )}
           </div>
         </div>
 
+        {/* Results Header */}
+        {!isLoading && data?.metaData && (
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-foreground">
+              {isSearch ? `Search Results` : sectionTitle}
+            </h2>
+            <span className="text-sm text-muted-foreground">
+              {data.metaData.total.toLocaleString()} titles
+            </span>
+          </div>
+        )}
+
         {error && (
           <div className="rounded-xl border border-destructive/50 bg-destructive/10 p-6 text-center text-destructive mb-6">
-            <p className="font-semibold mb-1.5">Error loading mangas</p>
+            <p className="font-semibold mb-1.5">Error loading content</p>
             <p className="text-sm text-destructive/80">
               {error instanceof Error ? error.message : "Unknown error"}
             </p>
           </div>
         )}
 
-        <MangaGrid mangas={data?.mangaList || []} isLoading={isLoading} />
+        {/* Only show loading on initial load, not background refetches */}
+        <MangaGrid mangas={data?.mangaList || []} isLoading={isLoading && !data} />
 
         {!isLoading && data?.metaData && (
           <div
@@ -435,3 +466,4 @@ export default function Home() {
     </>
   );
 }
+

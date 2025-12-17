@@ -1,8 +1,9 @@
 "use client";
 
-import { memo, useMemo, useCallback, useState } from "react";
+import { memo, useMemo, useCallback, useState, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { BookOpen } from "lucide-react";
 import type { MangaListItem } from "@/lib/api/types";
@@ -16,6 +17,7 @@ import {
   getImageLoadingStrategy,
   PLACEHOLDER_IMAGE,
 } from "@/lib/manga-utils";
+import { getManga } from "@/lib/api/manga";
 
 export interface MangaCardProps {
   manga: MangaListItem;
@@ -32,6 +34,9 @@ const MangaCardComponent = function MangaCard({
 }: MangaCardProps) {
   const [imageError, setImageError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const queryClient = useQueryClient();
+  const prefetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hasPrefetchedRef = useRef(false);
 
   const statusLabel = useMemo(() => formatStatus(manga.status), [manga.status]);
   const statusColor = useMemo(
@@ -65,6 +70,28 @@ const MangaCardComponent = function MangaCard({
     [handleCardClick]
   );
 
+  // Prefetch manga details on hover (with debounce)
+  const handleMouseEnter = useCallback(() => {
+    if (hasPrefetchedRef.current) return;
+    
+    // Debounce prefetch to avoid unnecessary requests on quick hovers
+    prefetchTimeoutRef.current = setTimeout(() => {
+      hasPrefetchedRef.current = true;
+      queryClient.prefetchQuery({
+        queryKey: ["manga", manga.id],
+        queryFn: () => getManga(manga.id),
+        staleTime: 10 * 60 * 1000, // 10 minutes
+      });
+    }, 150); // 150ms debounce
+  }, [manga.id, queryClient]);
+
+  const handleMouseLeave = useCallback(() => {
+    if (prefetchTimeoutRef.current) {
+      clearTimeout(prefetchTimeoutRef.current);
+      prefetchTimeoutRef.current = null;
+    }
+  }, []);
+
   return (
     <article
       className={cn("h-full", className)}
@@ -73,9 +100,13 @@ const MangaCardComponent = function MangaCard({
     >
       <Link
         href={mangaUrl}
+        prefetch={true}
         className="block h-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-2xl active:scale-[0.98] transition-transform"
         onClick={handleCardClick}
         onKeyDown={handleKeyDown}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        onFocus={handleMouseEnter}
         aria-label={`View ${manga.title} manga details`}
         aria-describedby={`manga-${manga.id}-description`}
         itemProp="url"
