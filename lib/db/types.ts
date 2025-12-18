@@ -124,7 +124,7 @@ export interface MangaUpsertData {
   totalChapters: number | null;
   coverArtId: string | null;
   followedCount: number;
-  mangaDexUpdatedAt: Date;
+  sourceUpdatedAt: Date;
   tagIds: string[];
 }
 

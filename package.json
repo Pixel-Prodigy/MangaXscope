@@ -14,7 +14,10 @@
     "db:generate": "prisma generate",
     "sync:full": "tsx lib/sync/run-sync.ts full",
     "sync:incremental": "tsx lib/sync/run-sync.ts incremental",
-    "sync:status": "tsx lib/sync/run-sync.ts status"
+    "sync:status": "tsx lib/sync/run-sync.ts status",
+    "webcomic:index": "tsx scripts/index-webcomics.ts",
+    "webcomic:index:full": "tsx scripts/index-webcomics.ts --full",
+    "webcomic:index:provider": "tsx scripts/index-webcomics.ts --provider"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.1.0",

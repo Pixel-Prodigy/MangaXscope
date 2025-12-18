@@ -11,14 +11,14 @@
  *    - Full tag/filter support from MangaDex
  * 
  * 2. WEBCOMICS SECTION (?section=webcomics)
- *    - Source: Consumet with multi-provider fallback
+ *    - Source: Neon DB (indexed Consumet data) with Consumet fallback
  *    - Content: Manhwa, Manhua, Webtoons
- *    - Providers tried sequentially for maximum coverage
+ *    - Uses trigram search for fuzzy text matching
  * 
  * ROUTING RULES:
  * - section=manga → MangaDex (DB cache or direct API)
- * - section=webcomics → Consumet multi-provider
- * - type=manhwa|manhua|webtoon → Consumet
+ * - section=webcomics → Neon DB (indexed) or Consumet fallback
+ * - type=manhwa|manhua|webtoon → Webcomics search
  * - Default (no section) → MangaDex for backward compatibility
  */
 
@@ -29,6 +29,10 @@ import {
   mangadexProvider,
   searchWithFallback,
 } from "@/lib/providers";
+import {
+  searchWebcomicsWithTrigram,
+  hasWebcomicData,
+} from "@/lib/db/webcomic-search";
 import type { 
   ContentType, 
   ContentSection,
@@ -188,7 +192,7 @@ function buildOrderBy(params: DbSearchParams): Prisma.MangaOrderByWithRelationIn
     case "popularity":
       return [{ followedCount: sortOrder }];
     case "latest":
-      return [{ mangaDexUpdatedAt: sortOrder }];
+      return [{ sourceUpdatedAt: sortOrder }];
     case "title":
       return [{ title: sortOrder === "desc" ? "desc" : "asc" }];
     case "year":
@@ -196,8 +200,8 @@ function buildOrderBy(params: DbSearchParams): Prisma.MangaOrderByWithRelationIn
     case "relevance":
     default:
       return params.query
-        ? [{ followedCount: "desc" }, { mangaDexUpdatedAt: "desc" }]
-        : [{ mangaDexUpdatedAt: "desc" }];
+        ? [{ followedCount: "desc" }, { sourceUpdatedAt: "desc" }]
+        : [{ sourceUpdatedAt: "desc" }];
   }
 }
 
@@ -240,7 +244,7 @@ async function searchDatabase(params: DbSearchParams) {
     year: manga.year,
     totalChapters: manga.totalChapters,
     lastChapter: manga.lastChapter,
-    updatedAt: manga.mangaDexUpdatedAt.toISOString(),
+    updatedAt: manga.sourceUpdatedAt?.toISOString() || manga.updatedAt.toISOString(),
   }));
 
   return {
@@ -365,57 +369,62 @@ export async function GET(request: NextRequest) {
     // SECTION-BASED ROUTING (PRIMARY)
     // =========================================================================
 
-    // WEBCOMICS SECTION: Use Consumet with multi-provider aggregation for MAXIMUM COVERAGE
+    // WEBCOMICS SECTION: Use Neon DB (indexed) with Consumet fallback
     if (params.section === "webcomics") {
-      console.log("[Search API] Routing to WEBCOMICS section (Consumet multi-provider aggregation)");
+      console.log("[Search API] Routing to WEBCOMICS section");
       
-      // ===== STRATEGY FOR MAXIMUM COVERAGE =====
-      // Use Consumet aggregation for ALL webcomics requests.
-      // The aggregation function:
-      // 1. Iterates through ALL providers (no early return)
-      // 2. Deep paginates each provider (up to 25 pages)
-      // 3. Deduplicates results by normalized title
-      // 4. Returns aggregated, unique results
+      // ===== STRATEGY: DATABASE FIRST, CONSUMET FALLBACK =====
+      // 1. Check if we have indexed webcomic data in Neon
+      // 2. If yes, use trigram search for fast, fuzzy matching
+      // 3. If no data, fall back to live Consumet API
+      
+      const webcomicsInDb = await hasWebcomicData();
+      
+      if (webcomicsInDb) {
+        console.log("[Search API] Using indexed webcomic data from Neon DB");
+        
+        // Use database search with trigram similarity
+        const dbResult = await searchWebcomicsWithTrigram({
+          query: params.query,
+          webcomicType: params.webcomicType,
+          status: params.status,
+          contentRating: params.contentRating,
+          includedTags: params.includedTags,
+          excludedTags: params.excludedTags,
+          minChapters: params.minChapters,
+          maxChapters: params.maxChapters,
+          minYear: params.minYear,
+          maxYear: params.maxYear,
+          limit: params.limit,
+          offset: params.offset,
+          sortBy: params.sortBy,
+          sortOrder: params.sortOrder,
+        });
+        
+        console.log(`[Search API] DB returned ${dbResult.mangaList.length} results (total: ${dbResult.metaData.total})`);
+        return createCachedResponse(dbResult);
+      }
+      
+      // Fallback: No indexed data, use live Consumet API
+      console.log("[Search API] No indexed data, falling back to live Consumet API");
       
       const consumetResult = await searchWithFallback(params);
       
-      // If Consumet returned results, use them
       if (consumetResult.mangaList.length > 0) {
-        console.log(`[Search API] Consumet aggregation returned ${consumetResult.mangaList.length} results (total: ${consumetResult.metaData.total})`);
+        console.log(`[Search API] Consumet returned ${consumetResult.mangaList.length} results`);
         return createCachedResponse(consumetResult);
       }
       
-      // Only fallback to MangaDex if ALL Consumet providers completely failed
-      console.log("[Search API] Consumet returned 0 results, falling back to MangaDex cache");
+      // Last resort: MangaDex for Korean/Chinese content
+      console.log("[Search API] Consumet returned 0 results, trying MangaDex");
       
-      // Determine target languages based on webcomicType
-      let languages: string[] = ["ko", "zh"]; // Default: both Korean and Chinese
+      let languages: string[] = ["ko", "zh"];
       if (params.webcomicType === "manhwa" || params.webcomicType === "webtoon") {
         languages = ["ko"];
       } else if (params.webcomicType === "manhua") {
         languages = ["zh"];
       }
       
-      const dbAvailable = await isDatabaseAvailable();
-      
-      if (dbAvailable) {
-        const dbParams: DbSearchParams = {
-          ...params,
-          originalLanguage: languages,
-          sortBy: params.sortBy || "latest",
-        };
-        const dbResult = await searchDatabase(dbParams);
-        
-        // Transform to indicate content type
-        dbResult.mangaList = dbResult.mangaList.map(manga => ({
-          ...manga,
-          contentType: manga.language === "ko" ? "manhwa" as const : "manhua" as const,
-        }));
-        
-        return createCachedResponse(dbResult);
-      }
-      
-      // If no DB, try MangaDex API directly
       const mangadexResult = await mangadexProvider.search({
         ...params,
         language: languages as OriginalLanguage[],
@@ -447,9 +456,27 @@ export async function GET(request: NextRequest) {
 
     const contentType = params.type;
 
-    // Route to Consumet for non-Japanese content types
+    // Route to webcomics search for non-Japanese content types
     if (contentType && contentType !== "manga") {
-      console.log(`[Search API] Legacy routing: type=${contentType} → Consumet`);
+      console.log(`[Search API] Legacy routing: type=${contentType} → Webcomics`);
+      
+      // Check database first
+      const webcomicsInDb = await hasWebcomicData();
+      if (webcomicsInDb) {
+        const dbResult = await searchWebcomicsWithTrigram({
+          query: params.query,
+          webcomicType: contentType as WebcomicType,
+          status: params.status,
+          contentRating: params.contentRating,
+          limit: params.limit,
+          offset: params.offset,
+          sortBy: params.sortBy,
+          sortOrder: params.sortOrder,
+        });
+        return createCachedResponse(dbResult);
+      }
+      
+      // Fallback to Consumet
       const result = await searchWithFallback({
         ...params,
         webcomicType: contentType as WebcomicType,
@@ -457,10 +484,27 @@ export async function GET(request: NextRequest) {
       return createCachedResponse(result);
     }
 
-    // Route by language (Korean/Chinese → Consumet)
+    // Route by language (Korean/Chinese → Webcomics)
     const hasKoreanOrChinese = params.language?.some(l => l === "ko" || l === "zh");
     if (hasKoreanOrChinese) {
-      console.log("[Search API] Legacy routing: language=ko|zh → Consumet");
+      console.log("[Search API] Legacy routing: language=ko|zh → Webcomics");
+      
+      // Check database first
+      const webcomicsInDb = await hasWebcomicData();
+      if (webcomicsInDb) {
+        const dbResult = await searchWebcomicsWithTrigram({
+          query: params.query,
+          status: params.status,
+          contentRating: params.contentRating,
+          limit: params.limit,
+          offset: params.offset,
+          sortBy: params.sortBy,
+          sortOrder: params.sortOrder,
+        });
+        return createCachedResponse(dbResult);
+      }
+      
+      // Fallback to Consumet
       const result = await searchWithFallback(params);
       return createCachedResponse(result);
     }
@@ -526,6 +570,28 @@ export async function POST(request: NextRequest) {
 
     // Section-based routing
     if (params.section === "webcomics") {
+      // Check database first
+      const webcomicsInDb = await hasWebcomicData();
+      if (webcomicsInDb) {
+        const dbResult = await searchWebcomicsWithTrigram({
+          query: params.query,
+          webcomicType: params.webcomicType,
+          status: params.status,
+          contentRating: params.contentRating,
+          includedTags: params.includedTags,
+          excludedTags: params.excludedTags,
+          minChapters: params.minChapters,
+          maxChapters: params.maxChapters,
+          minYear: params.minYear,
+          maxYear: params.maxYear,
+          limit: params.limit,
+          offset: params.offset,
+          sortBy: params.sortBy,
+          sortOrder: params.sortOrder,
+        });
+        return createCachedResponse(dbResult);
+      }
+      // Fallback to Consumet
       const result = await searchWithFallback(params);
       return createCachedResponse(result);
     }
@@ -541,6 +607,22 @@ export async function POST(request: NextRequest) {
     // Legacy content type routing
     const contentType = params.type;
     if (contentType && contentType !== "manga") {
+      // Check database first
+      const webcomicsInDb = await hasWebcomicData();
+      if (webcomicsInDb) {
+        const dbResult = await searchWebcomicsWithTrigram({
+          query: params.query,
+          webcomicType: contentType as WebcomicType,
+          status: params.status,
+          contentRating: params.contentRating,
+          limit: params.limit,
+          offset: params.offset,
+          sortBy: params.sortBy,
+          sortOrder: params.sortOrder,
+        });
+        return createCachedResponse(dbResult);
+      }
+      // Fallback to Consumet
       const result = await searchWithFallback({
         ...params,
         webcomicType: contentType as WebcomicType,

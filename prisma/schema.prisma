@@ -1,12 +1,11 @@
 // Prisma Schema for MangaXScope
 // 
 // DATABASE ARCHITECTURE:
-// - Database is used as a CACHE layer, not a full mirror
-// - Stores normalized metadata from MangaDex (Japanese manga only)
-// - Source and sourceId fields enable multi-source support
-// - Short TTL for search results, longer for details
-//
-// Note: Consumet content is NOT cached in database as it's less stable
+// - Database stores both MangaDex manga and Consumet webcomics
+// - Manga section: MangaDex (Japanese manga)
+// - Webcomics section: Consumet (manhwa, manhua, webtoons)
+// - Source and provider fields enable multi-source support
+// - Trigram indexes for fuzzy search
 
 generator client {
   provider        = "prisma-client-js"
@@ -22,13 +21,18 @@ datasource db {
 // MAIN MODELS
 // =============================================================================
 
-/// Cached manga metadata from external sources
+/// Cached manga/webcomic metadata from external sources
 model Manga {
-  id                     String        @id // Source-specific ID (MangaDex UUID)
+  id                     String        @id // Source-specific ID (MangaDex UUID or generated for Consumet)
   
   // Source tracking
   source                 DataSource    @default(MANGADEX)
   sourceId               String?       // Original ID from source (for reference)
+  provider               String?       // Consumet provider name (mangakakalot, asurascans, etc.)
+  providerSeriesId       String?       // Provider-specific series ID for Consumet
+  
+  // Content classification
+  contentType            ContentType   @default(MANGA)
   
   // Core metadata (normalized)
   title                  String
@@ -47,6 +51,7 @@ model Manga {
   
   // Media
   coverArtId             String?
+  coverImage             String?       // Direct cover URL for Consumet content
   
   // Popularity metrics
   followedCount          Int           @default(0)
@@ -55,7 +60,7 @@ model Manga {
   // Cache management
   createdAt              DateTime      @default(now())
   updatedAt              DateTime      @updatedAt
-  mangaDexUpdatedAt      DateTime      // Track source updates
+  sourceUpdatedAt        DateTime?     // Track source updates (was mangaDexUpdatedAt)
   
   // TTL for cache expiration (optional, can be handled in app logic)
   expiresAt              DateTime?
@@ -71,9 +76,14 @@ model Manga {
   @@index([year])
   @@index([totalChapters])
   @@index([followedCount])
-  @@index([mangaDexUpdatedAt])
+  @@index([sourceUpdatedAt])
   @@index([contentRating])
   @@index([expiresAt])
+  @@index([contentType])
+  @@index([provider])
+  
+  // Unique constraint for Consumet sources to prevent duplicates
+  @@unique([source, provider, providerSeriesId], name: "unique_source_provider_id")
 }
 
 /// Cached tags for filtering
@@ -100,12 +110,24 @@ model MangaTag {
   @@index([tagId])
 }
 
-/// Sync metadata for tracking database updates
+/// Sync metadata for tracking MangaDex database updates
 model SyncMetadata {
   id                  String     @id @default("singleton")
   lastFullSync        DateTime?
   lastIncrementalSync DateTime?
   totalMangaCount     Int        @default(0)
+  syncStatus          SyncStatus @default(IDLE)
+  lastError           String?
+  updatedAt           DateTime   @updatedAt
+}
+
+/// Sync metadata for tracking Webcomic (Consumet) indexing
+model WebcomicSyncMetadata {
+  id                  String     @id @default("webcomic-singleton")
+  lastFullSync        DateTime?
+  lastProvider        String?    // Resume point: last provider being indexed
+  lastQuery           String?    // Resume point: last query letter (a-z, 0-9)
+  totalIndexed        Int        @default(0)
   syncStatus          SyncStatus @default(IDLE)
   lastError           String?
   updatedAt           DateTime   @updatedAt
@@ -119,6 +141,14 @@ model SyncMetadata {
 enum DataSource {
   MANGADEX
   CONSUMET
+}
+
+/// Content type classification
+enum ContentType {
+  MANGA
+  MANHWA
+  MANHUA
+  WEBTOON
 }
 
 /// Publication status

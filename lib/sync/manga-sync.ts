@@ -116,7 +116,7 @@ function transformMangaData(manga: MangaDexMangaForSync): {
     totalChapters: estimateTotalChapters(attrs.lastChapter),
     coverArtId: findRelationship(manga.relationships, "cover_art"),
     followedCount: 0, // Would need statistics API
-    mangaDexUpdatedAt: new Date(attrs.updatedAt),
+    sourceUpdatedAt: new Date(attrs.updatedAt),
     tagIds: attrs.tags.map((t) => t.id),
   };
 
